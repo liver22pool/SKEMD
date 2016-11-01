@@ -1,0 +1,347 @@
+﻿@{
+    Layout = null;// "~/Views/Shared/_Layout.cshtml";
+}
+
+@Styles.Render("~/Content/login")
+
+<link href="~/Content/ReportStyle.css" rel="stylesheet"/>
+
+@model List<SKEMD_WWW.Models.ReportModel>
+
+<div class="header" style="height: 57px">
+    <div style="width: 700px; margin: 0 auto; padding: 0 100px">
+        <a href="@Url.Action("Index")"><img src="~/Content/img/header_1_logo.png" class="img_header_logo" /></a>
+        <div id="img_header_title" style="text-align: center">
+            <label>Система комплексного екологічного</label>
+            <div style="height: 4px;"></div>
+            <label>моніторингу м.Дніпродзержинськ</label>
+        </div>
+        <img src="~/Content/img/header-herb.png" class="img_header_logo img_header_logo2" />
+        @using (Html.BeginForm("CreateReportXLS", "Home", FormMethod.Post, new { id = "myForm" }))
+        { 
+            <input type="hidden" name="hiddenAPKIDSelector" id="hiddenAPKIDSelector" value="0"/>
+            <input type="hidden" name="hiddenPIB" id="hiddenPIB" value=""/>
+            <input type="hidden" name="hiddenDateDay" id="hiddenDateDay" value="@Model[0].Day"/>
+            <input type="hidden" name="hiddenDateMonth" id="hiddenDateMonth" value="@Model[0].Month"/>
+            <input type="hidden" name="hiddenDateYear" id="hiddenDateYear" value="@Model[0].Year"/>
+            
+            <a onclick="javascript:$('#myForm').submit();"; href="#"><img style="margin-top: 3px; float: right; cursor: pointer" src="~/Content/img/excel-logo.png"/></a>
+        }
+        <img style="margin-top: 3px; margin-right: 10px; float: right; cursor: pointer" src="~/Content/img/pdf-logo.png" onclick="genPDF()"/>
+    </div>
+</div>
+
+<div style="margin: 10px 20px 10px ">
+    <label>Пост: </label>
+    <select id="PostSelect" onchange="PostChanged(this.selectedIndex)" style="margin-right: 20px">
+        <option selected>@Model[0].Description</option>
+        @for (int i = 1; i < @Model.Count(); i++)
+        {
+            <option>@Model[i].Description</option>
+        }
+    </select>
+    <label>ПІБ: </label>
+    <input type="text" id="repordAuthor" placeholder="Петренко П.П."/>    
+</div>
+
+<div id="report_table">
+    <div id="Date" style="font-family: 'Times New Roman'; font-size: 36px; position: absolute; left: 100px; top: 350px;"></div>
+    <div id="divAuthorName" style="font-family: 'Times New Roman'; font-size: 36px; position: absolute; left: 2700px; top: 450px; width: 100%"></div>
+    <div id="divPostName" style="font-family: 'Times New Roman'; font-size: 36px; position: absolute; left: 1350px; top: 670px; width: 100%"></div>
+    <div id="divPostAddress" style="font-family: 'Times New Roman'; font-size: 36px; position: absolute; left: 1350px; top: 710px; width: 100%"></div>
+    <table id="repTable" style="font-family: 'Times New Roman'; font-size: 36px; border-style: solid; position: absolute; left: 100px; top: 850px; width: 3150px; height: 300px; border: 1px solid black; border-collapse: collapse;">
+        <tr>
+                <td ROWSPAN=2 style="width: 2%">№</td>
+                <td ROWSPAN=2 style="width: 12%">Величина що вимірюється</td>
+                <td ROWSPAN=2 style="width: 4%">Одиниця виміру</td>
+                <td COLSPAN=2 style="width: 12%">КР</td>
+                <td COLSPAN=24>Дані по годинах</td>
+        </tr>
+        <tr>
+                <td>ПДК</td>   
+                <td>Макс. дозвіл</td>     
+                <td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>7</td><td>8</td><td>9</td><td>10</td><td>11</td><td>12</td>
+                <td>13</td><td>14</td><td>15</td><td>16</td><td>17</td><td>18</td><td>19</td><td>20</td><td>21</td><td>22</td><td>23</td><td>24</td>
+        </tr>
+        <tr>
+                <td>1</td>
+                <td>Оксид вуглецю СО2</td>
+                <td>мг/м3</td>
+                <td></td><td></td>
+                <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+                <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+        </tr>
+        <tr>
+                <td>2</td>
+                <td>Азоту діоксид NO2</td>
+                <td>мг/м3</td>
+                <td></td><td></td>
+                <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+                <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+        </tr>
+        <tr>
+                <td>3</td>
+                <td>Сірки діоксид SO2</td>
+                <td>мг/м3</td>
+                <td></td><td></td>
+                <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+                <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+        </tr>
+    </table>
+</div>
+
+
+@Scripts.Render("~/bundles/jquery")   
+<script src="~/Scripts/jspdf.js"></script>
+<script src="~/Scripts/html2canvas.js"></script>
+
+<script type="text/javascript">
+    $(document).ready(function(){
+        var modl = @Html.Raw(Json.Encode(Model))
+        $('#report_table').css("background", "url(../Content/img/AGAM" + modl[$('#PostSelect')[0].selectedIndex].Type + ".png) 100% 100% no-repeat");
+        FillTable(modl[$('#PostSelect')[0].selectedIndex].Type);
+        //var date = new Date($('#hiddenDateYear').val(), $('#hiddenDateMonth').val(), $('#hiddenDateDay').val());
+        var date_str = ("0" + ($('#hiddenDateDay').val())).slice(-2) + '.' + ("0" + ($('#hiddenDateMonth').val())).slice(-2) + '.' + $('#hiddenDateYear').val();
+        $('#Date').append(date_str);
+        $('#divPostName').append('<b>' + $('#PostSelect').val() + '</b>');
+        $('#divPostAddress').append('<b>' + modl[$('#PostSelect')[0].selectedIndex].Name + '</b>');
+    });
+    
+    function FillTable(apkType) {
+        var date = $('#hiddenDateDay').val() + '.' + $('#hiddenDateMonth').val() + '.' + $('#hiddenDateYear').val();
+        $.ajax({
+            type: "GET",
+            dataType: 'json',
+            contentType: 'application/json',
+            data: { APKID: $('#PostSelect')[0].selectedIndex, day: $('#hiddenDateDay').val(), month: $('#hiddenDateMonth').val(), year: $('#hiddenDateYear').val()},
+            url: '@Url.Action("GetAPKParametersForReport")',
+            success: function (result) {
+                $('#repTable').empty();
+                
+                var str = GetTable(apkType, result);
+                
+                $('#repTable').append(str);
+            }
+        });
+    }
+
+    function genPDF() {
+        html2canvas(document.getElementById("report_table"), {
+            onrendered: function(canvas){
+                var img = canvas.toDataURL("image/png");
+                var doc = new jsPDF('l', 'pt', [3307, 2339]);
+                img.height = 500;
+                img.width = 300;
+
+                doc.addImage(img, 'JPEG', 0, 0, canvas.width, canvas.height);
+                doc.save('report.pdf');
+            }  
+        });
+    }
+
+    function GetTable(type, result){
+        if(type == 0){ //chem
+            str = '<tr> <td ROWSPAN=2 style="width: 2%">№</td> <td ROWSPAN=2 style="width: 12%">Величина що вимірюється</td>' +
+                    '<td ROWSPAN=2 style="width: 4%">Одиниця виміру</td> <td COLSPAN=2 style="width: 12%">КР</td> <td COLSPAN=24>Дані по годинах</td></tr>' +
+                    '<tr><td>ПДК</td><td>Макс. дозвіл</td><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>7</td><td>8</td><td>9</td>' +
+                    '<td>10</td><td>11</td><td>12</td><td>13</td><td>14</td><td>15</td><td>16</td><td>17</td><td>18</td><td>19</td><td>20</td>' +
+                    '<td>21</td><td>22</td><td>23</td><td>24</td></tr>' +
+                    '<tr><td>1</td><td>Оксид вуглецю СО2</td><td>мг/м3</td><td></td><td></td>';
+            for (var i = 0; i < 24; i++)
+            {
+                var data = '';
+                if (result[0].length > i)
+                    data = result[0][i];
+                str = str + '<td>' + data + '</td>'
+            }
+            str = str + '</tr><tr><td>2</td><td>Азоту діоксид NO2</td><td>мг/м3</td><td></td><td></td>'
+            for (var i = 0; i < 24; i++)
+            {
+                var data = '';
+                if (result[1].length > i)
+                    data = result[1][i];
+                str = str + '<td>' + data + '</td>'
+            }
+            str = str + '</tr><tr><td>3</td><td>Сірки діоксид SO2</td><td>мг/м3</td><td></td><td></td>'
+            for (var i = 0; i < 24; i++) {
+                var data = '';
+                if (result[2].length > i)
+                    data = result[2][i];
+                str = str + '<td>' + data + '</td>'
+            }
+            str = str + '</tr>';
+        }
+        else if (type == 5) { //gamaANDchem
+            str = '<tr> <td ROWSPAN=2 style="width: 2%">№</td> <td ROWSPAN=2 style="width: 12%">Величина що вимірюється</td>' +
+                    '<td ROWSPAN=2 style="width: 4%">Одиниця виміру</td> <td COLSPAN=2 style="width: 12%">КР</td> <td COLSPAN=24>Дані по годинах</td></tr>' +
+                    '<tr><td>ПДК</td><td>Макс. дозвіл</td><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>7</td><td>8</td><td>9</td>' +
+                    '<td>10</td><td>11</td><td>12</td><td>13</td><td>14</td><td>15</td><td>16</td><td>17</td><td>18</td><td>19</td><td>20</td>' +
+                    '<td>21</td><td>22</td><td>23</td><td>24</td></tr>' +
+                    '<tr><td>1</td><td>Оксид вуглецю СО2</td><td>мг/м3</td><td></td><td></td>';
+            for (var i = 0; i < 24; i++) {
+                var data = '';
+                if (result[0].length > i)
+                    data = result[0][i];
+                str = str + '<td>' + data + '</td>'
+            }
+            str = str + '</tr><tr><td>2</td><td>Азоту діоксид NO2</td><td>мг/м3</td><td></td><td></td>'
+            for (var i = 0; i < 24; i++) {
+                var data = '';
+                if (result[1].length > i)
+                    data = result[1][i];
+                str = str + '<td>' + data + '</td>'
+            }
+            str = str + '</tr><tr><td>2</td><td>Сірки діоксид SO2</td><td>мг/м3</td><td></td><td></td>'
+            for (var i = 0; i < 24; i++) {
+                var data = '';
+                if (result[2].length > i)
+                    data = result[2][i];
+                str = str + '<td>' + data + '</td>'
+            }
+            str = str + '</tr><tr><td>4</td><td>Потужність амбієнтного еквівалента дози гамма-випромінювання</td><td>мкЗв/г</td><td></td><td></td>'
+            for (var i = 0; i < 24; i++) {
+                var data = '';
+                if (result[3].length > i)
+                    data = result[2][i];
+                str = str + '<td>' + data + '</td>'
+            }
+            str = str + '</tr>';
+        }
+        else if (type == 2) { //gamaANDControl
+            str = '<tr> <td ROWSPAN=2 style="width: 2%">№</td> <td ROWSPAN=2 style="width: 12%">Величина що вимірюється</td>' +
+                    '<td ROWSPAN=2 style="width: 4%">Одиниця виміру</td> <td COLSPAN=2 style="width: 12%">КР</td> <td COLSPAN=24>Дані по годинах</td></tr>' +
+                    '<tr><td>ПДК</td><td>Макс. дозвіл</td><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>7</td><td>8</td><td>9</td>' +
+                    '<td>10</td><td>11</td><td>12</td><td>13</td><td>14</td><td>15</td><td>16</td><td>17</td><td>18</td><td>19</td><td>20</td>' +
+                    '<td>21</td><td>22</td><td>23</td><td>24</td></tr>' +
+                    '<tr><td>1</td><td>Масова витрата повітря</td><td>кг/с</td><td></td><td></td>';
+            for (var i = 0; i < 24; i++) {
+                var data = '';
+                if (result[0].length > i)
+                    data = result[0][i];
+                str = str + '<td>' + data + '</td>'
+            }
+            str = str + "</tr><tr><td>2</td><td>Об'єм прокачаного повітря</td><td>м3</td><td></td><td></td>"
+            for (var i = 0; i < 24; i++) {
+                var data = '';
+                if (result[1].length > i)
+                    data = result[1][i];
+                str = str + '<td>' + data + '</td>'
+            }
+            str = str + '</tr><tr><td>2</td><td>Речовини у вигляді суспендованих твердих частинок недиференційованих за складом</td><td>мг/м3</td><td></td><td></td>'
+            for (var i = 0; i < 24; i++) {
+                var data = '';
+                if (result[2].length > i)
+                    data = result[2][i];
+                str = str + '<td>' + data + '</td>'
+            }
+            str = str + '</tr>';
+        }
+        else if (type == 3) { //radio
+            str = '<tr> <td ROWSPAN=2 style="width: 2%">№</td> <td ROWSPAN=2 style="width: 12%">Величина що вимірюється</td>' +
+                    '<td ROWSPAN=2 style="width: 4%">Одиниця виміру</td> <td COLSPAN=2 style="width: 12%">КР</td> <td COLSPAN=24>Дані по годинах</td></tr>' +
+                    '<tr><td>ПДК</td><td>Макс. дозвіл</td><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>7</td><td>8</td><td>9</td>' +
+                    '<td>10</td><td>11</td><td>12</td><td>13</td><td>14</td><td>15</td><td>16</td><td>17</td><td>18</td><td>19</td><td>20</td>' +
+                    '<td>21</td><td>22</td><td>23</td><td>24</td></tr>' +
+                    '<tr><td>1</td><td>Енергія гамма-випромінювання</td><td>МэВ</td><td></td><td></td>';
+            for (var i = 0; i < 24; i++) {
+                var data = '';
+                if (result[0].length > i)
+                    data = result[0][i];
+                str = str + '<td>' + data + '</td>'
+            }
+            str = str + '</tr><tr><td>2</td><td>Щільність потоку гамма-випромінювання з енергією 660 кеВ</td><td>хв-1∙см-2</td><td></td><td></td>'
+            for (var i = 0; i < 24; i++) {
+                var data = '';
+                if (result[1].length > i)
+                    data = result[1][i];
+                str = str + '<td>' + data + '</td>'
+            }
+            str = str + '</tr>';
+        }
+        else if (type == 4) { //meteo
+            str = '<tr> <td ROWSPAN=2 style="width: 2%">№</td> <td ROWSPAN=2 style="width: 12%">Величина що вимірюється</td>' +
+                    '<td ROWSPAN=2 style="width: 4%">Одиниця виміру</td> <td COLSPAN=2 style="width: 12%">КР</td> <td COLSPAN=24>Дані по годинах</td></tr>' +
+                    '<tr><td>ПДК</td><td>Макс. дозвіл</td><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>7</td><td>8</td><td>9</td>' +
+                    '<td>10</td><td>11</td><td>12</td><td>13</td><td>14</td><td>15</td><td>16</td><td>17</td><td>18</td><td>19</td><td>20</td>' +
+                    '<td>21</td><td>22</td><td>23</td><td>24</td></tr>' +
+                    '<tr><td>1</td><td>Температура</td><td>C</td><td></td><td></td>';
+            for (var i = 0; i < 24; i++) {
+                var data = '';
+                if (result[0].length > i)
+                    data = result[0][i];
+                str = str + '<td>' + data + '</td>'
+            }
+            str = str + '</tr><tr><td>2</td><td>Відносна вологість</td><td>%</td><td></td><td></td>'
+            for (var i = 0; i < 24; i++) {
+                var data = '';
+                if (result[1].length > i)
+                    data = result[1][i];
+                str = str + '<td>' + data + '</td>'
+            }
+            str = str + '</tr><tr><td>2</td><td>Швидкість вітру</td><td>м/c</td><td></td><td></td>'
+            for (var i = 0; i < 24; i++) {
+                var data = '';
+                if (result[2].length > i)
+                    data = result[2][i];
+                str = str + '<td>' + data + '</td>'
+            }
+            str = str + '</tr><tr><td>2</td><td>Напрямок вітру</td><td>град</td><td></td><td></td>'
+            for (var i = 0; i < 24; i++) {
+                var data = '';
+                if (result[3].length > i)
+                    data = result[2][i];
+                str = str + '<td>' + data + '</td>'
+            }
+            str = str + '</tr><tr><td>2</td><td>Опади</td><td>мм/год</td><td></td><td></td>'
+            for (var i = 0; i < 24; i++) {
+                var data = '';
+                if (result[4].length > i)
+                    data = result[2][i];
+                str = str + '<td>' + data + '</td>'
+            }
+            str = str + '</tr><tr><td>2</td><td>Атмосферний тиск</td><td>мм. рт. ст.</td><td></td><td></td>'
+            for (var i = 0; i < 24; i++) {
+                var data = '';
+                if (result[5].length > i)
+                    data = result[2][i];
+                str = str + '<td>' + data + '</td>'
+            }
+            str = str + '</tr>';
+        }
+        else if (type == 1) { //gama
+            str = '<tr> <td ROWSPAN=2 style="width: 2%">№</td> <td ROWSPAN=2 style="width: 12%">Величина що вимірюється</td>' +
+                    '<td ROWSPAN=2 style="width: 4%">Одиниця виміру</td> <td COLSPAN=2 style="width: 12%">КР</td> <td COLSPAN=24>Дані по годинах</td></tr>' +
+                    '<tr><td>ПДК</td><td>Макс. дозвіл</td><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>7</td><td>8</td><td>9</td>' +
+                    '<td>10</td><td>11</td><td>12</td><td>13</td><td>14</td><td>15</td><td>16</td><td>17</td><td>18</td><td>19</td><td>20</td>' +
+                    '<td>21</td><td>22</td><td>23</td><td>24</td></tr>' +
+                    '<tr><td>1</td><td>Потужність амбієнтного еквівалента дози гамма-випромінювання</td><td>мкЗв/г</td><td></td><td></td>';
+            for (var i = 0; i < 24; i++) {
+                var data = '';
+                if (result[0].length > i)
+                    data = result[0][i];
+                str = str + '<td>' + data + '</td>'
+            }
+            str = str + '</tr>';
+        }
+        return str;
+    }
+
+    function PostChanged(index) {
+        var modl = @Html.Raw(Json.Encode(Model))
+        $('#report_table').css("background", "url(../Content/img/AGAM" + modl[index].Type + ".png) 100% 100% no-repeat");
+        $('#divPostName').empty();
+        $('#divPostName').append('<b>' + $('#PostSelect').val() + '</b>');
+        $('#divPostAddress').empty();
+        $('#divPostAddress').append('<b>' + modl[index].Name + '</b>');
+        $('#hiddenAPKIDSelector').val(index);
+
+        FillTable(modl[index].Type);
+    }
+
+    $('#repordAuthor').keyup(function () {
+        var Value = $('#repordAuthor').val();
+        $('#divAuthorName').empty();
+        $('#divAuthorName').append(Value);
+        $('#hiddenPIB').val(Value);
+    });
+</script>

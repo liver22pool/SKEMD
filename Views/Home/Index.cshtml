@@ -1,0 +1,968 @@
+﻿@{
+    ViewBag.Title = "Index";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+@model SKEMD_WWW.Models.GraphValidationModel
+
+<script>
+    $('#ul_header_menu2 li').removeClass("current"); // удаляем у всех ссылок класс selected
+    $('#header_li_map').addClass("current"); // устанавливаем класс active при нажатии
+</script>
+
+<script type="text/javascript">// <![CDATA[
+    jQuery(document).ready(function () {
+        jQuery('.spoiler-text').hide()
+        jQuery('.spoiler').click(function () {
+            jQuery(this).toggleClass("folded").toggleClass("unfolded").next().slideToggle()
+        })
+    })
+    // ]]></script>
+
+
+    @Scripts.Render("~/js/datepicker")
+    @Styles.Render("~/css/datepicker")
+
+    
+<script type="text/javascript" src="http://maps.googleapis.com/maps/api/js?sensor=true&&key=AIzaSyBVhj_t4zwinMvs8Ng7Huy2uGyWqYnCzyQ"></script>
+<script type="text/javascript" src="~/Scripts/markerwithlabel.js"></script>
+<script>
+    var map;
+    var markers = [];
+    var apkes = [];
+    var infowindows = [];
+    var active_mark;
+    var events = [];
+    var RefreshAPKTimer;
+    var autoCloseContext = true;
+    var currentAPKforAutoChangeContext = 0;
+    var AutoChangeContextTimer;
+
+    function InitializeMap()
+        {
+            var latlng = new google.maps.LatLng(48.515816, 34.606298);
+            var myOptions = {
+                zoom: 12,
+                center: latlng,
+                mapTypeId: google.maps.MapTypeId.ROADMAP,
+                zoomControl: true,
+                zoomControlOptions: {
+                    position: google.maps.ControlPosition.LEFT_CENTER
+                },
+                mapTypeControl: true,
+                mapTypeControlOptions: {
+                    position: google.maps.ControlPosition.LEFT_CENTER
+                }
+            };
+            map = new google.maps.Map(document.getElementById("GMap1"), myOptions);
+            //fill map markers
+            CheckConnection();
+            $.ajax({
+                type: 'GET',
+                dataType: 'json',
+                contentType: 'application/json',
+                url: '@Url.Action("GenerateAPK", "Home")',
+                data: {all: true, id: 0},
+                success: function (apk) {
+                    CheckAPKForErrors(apk);
+                    for (var i = 0; i < apk.length; i++) {
+                        SetMarker(apk[i].ID, apk[i].Number, apk[i].Lat, apk[i].Lan, apk[i].Name, apk[i].Status, apk[i].Type);
+                        apkes.push(apk[i]);
+                    }
+                    active_mark = 0;
+                    markers[active_mark].setIcon('http://maps.google.com/mapfiles/ms/icons/purple-dot.png');
+                    InitAPKInfo();
+                    InfoSettingsLoad(apk);
+                    $('#DateFrom').val('');
+                    $('#DateTo').val('');
+                    UpdateEventsJournal();
+                    UpdateFooter();
+
+                    RefreshAPKTimer = setInterval(function () {
+                        CheckConnection();
+                        StatusRefresh();
+                        UpdateEventsJournal();
+                    }, 1000 * 60 * 20/*20 min*/);
+                }
+            });
+
+        
+        }
+    
+    function SetMarker(ID, Number, Lat, Lang, Name, Status, Type)
+    {
+        var latlng = new google.maps.LatLng(Lat, Lang);
+        var color = '../Content/img/smarker_' + Status + '.png';
+        
+        @*var marker = new google.maps.Marker({
+            position: latlng,
+            map: map,
+            title: Title,
+            icon: color,
+            metadata: { type: Type, id: ID },
+            label: "12"
+        });*@
+
+        var marker = new MarkerWithLabel({
+            position: latlng,
+            map: map,
+            labelContent: "",
+            //labelAnchor: new google.maps.Point(0, 30),
+            labelClass: "labels", // the CSS class for the label
+            labelInBackground: false,
+            metadata: { status: Status, id: ID, number: Number, type: Type, setMapNullCounter: 0, currentIndex: 0 },
+            title: Name,
+            icon: color
+        });
+
+        var infowindow = new google.maps.InfoWindow({
+            content: " "
+        });
+
+        marker.addListener('click', function () {
+            if (autoCloseContext == true)
+                infowindows[active_mark].close();
+            SetActiveMarker(marker.metadata.id);
+            map.panTo(marker.getPosition());
+            infowindows[active_mark].open(map, markers[active_mark]);
+            InitAPKInfo();
+            //InfoSettingsLoad(apkes);
+        });
+
+        markers.push(marker);
+        infowindows.push(infowindow);
+    }
+
+    function SetActiveMarker(ID) {//markerTypeCombo
+        if ($('#markerTypeCombo')[0].selectedIndex == 0) {
+            for (var i = 0; i < markers.length; i++) {
+                if (markers[i].metadata.id == ID) {
+                    markers[active_mark].setIcon('../Content/img/smarker_' + markers[active_mark].metadata.status + '.png');
+                    active_mark = i;
+                    markers[active_mark].setIcon('../Content/img/smarker_active.png');
+                    break;
+                }
+            }
+        }
+        else {
+            for (var i = 0; i < markers.length; i++) {
+                if (markers[i].metadata.id == ID) {
+                    markers[active_mark].setIcon('../Content/img/marker_' + markers[active_mark].metadata.status + '.png');
+                    active_mark = i;
+                    markers[active_mark].setIcon('../Content/img/marker_active.png');
+                    break;
+                }
+            }
+        }
+    }
+    function SetInfoWindowContent(infowindow, content) {
+        infowindow.setContent(content);
+    }
+
+    function APKTypeStatusClick(checkbox, status) {
+        if ($(checkbox).is(':checked') == true) {
+            for (var i = 0; i < markers.length; i++) {
+                if (markers[i].metadata.status == status) {
+                    markers[i].metadata.setMapNullCounter = markers[i].metadata.setMapNullCounter - 1;
+                    if (markers[i].metadata.setMapNullCounter == 0)
+                        markers[i].setMap(map);
+                }
+            }
+        }
+        else {
+            for (var i = 0; i < markers.length; i++) {
+                if (markers[i].metadata.status == status) {
+                    markers[i].setMap(null);
+                    markers[i].metadata.setMapNullCounter = markers[i].metadata.setMapNullCounter + 1;
+                }
+            }
+        }
+    }
+    function APKMarkerTypeClick(type) {
+        if (type == 0) {
+            for (var i = 0; i < markers.length; i++)
+            {
+                markers[i].setIcon('../Content/img/smarker_' + markers[i].metadata.status + '.png');
+                markers[i].labelContent = '';
+                markers[i].label.setContent();
+            }
+            markers[active_mark].setIcon('../Content/img/smarker_active.png');
+            $('#APKMarkerIndexList').prop('disabled', 'disabled');
+        }
+        else {
+            for (var i = 0; i < markers.length; i++) {
+                markers[i].setIcon('../Content/img/marker_' + markers[i].metadata.status + '.png');
+                //markers[i].labelContent = 'New Label';
+                //запис показників в маркер
+                SetMarkerLabelContent(i);
+                markers[i].label.setContent();
+            }
+            markers[active_mark].setIcon('../Content/img/marker_active.png');
+            $('#APKMarkerIndexList').prop('disabled', false);
+        }
+        markers[active_mark].label.setContent();
+    }
+    function InitAPKInfo()
+    {
+        var apk;
+        for (var i = 0; i < apkes.length; i++)
+            if (apkes[i].ID == markers[active_mark].metadata.id){
+                apk = apkes[i];
+                break;
+            }
+        $('#lbl_Number_Name_of_post')[0].textContent = 'Пост №' + apk.Number + ' (' + apk.Name + ')';
+        $('#lbl_Type_of_post')[0].textContent = GetStringEqOfType(apk.Type);
+        $('#lbl_Address_of_post')[0].textContent = 'Довгота: ' + apk.Lat + '   |   Широта: ' + apk.Lan;
+        var obj = GetStringEqOfStatus(apk.Status);
+        $('#lbl_Date_of_post')[0].textContent = 'Станом на ' + apk.LastUpdateDateDate + '.' + apk.LastUpdateDateMonth + '.' + apk.LastUpdateDateYear +
+            '  ' + apk.LastUpdateDateHours + ':' + apk.LastUpdateDateMinutes;
+        $('#lbl_Status_of_post')[0].textContent = 'Статус:  ' + obj["Status"];
+        $('#lbl_Status_of_post')[0].style.color = obj["Color"];
+        $('#APKIndexes').empty();
+        for (var i = 0; i < apk.IndexNames.length; i++) {
+            var color = "background: white";
+            if (i % 2 == 0)
+                color = "background: #F8F8F8";
+            $('#APKIndexes').append(
+                '<p style="' + color + '"><label class="checkbox_lbl_typepost">' + apk.IndexNames[i] + '</label>' +
+                '<label style="float: right" class="checkbox_lbl_typepost">' + apk.IndexValues[i] + ' ' + apk.IndexValuesName[i] + '</label></p>'
+            );
+        }
+        $('#hiddenAPKIDInput').val(markers[active_mark].metadata.id);
+            @*}
+        });*@
+    }
+    function GetStringEqOfType(type) {
+        if (type == 0)
+            return 'Пост хімічного моніторингу';
+        else if (type == 1)
+            return 'Пост гама моніторингу';
+        else if (type == 2)
+            return 'Пост гама моніторингу та контролю аерозолей';
+        else if (type == 3)
+            return 'Пост контролю непоширення радіоактивного забруднення';
+        else if (type == 4)
+            return 'Пост метеостанції';
+        else if (type == 5)
+            return 'Пост гама та хімічного моніторингу';
+    }
+    function GetStringEqOfStatus(status) {
+        var obj = new Object();
+        if (status == 0){obj.Status = 'в ремонті'; obj.Color = 'blue'}
+        else if (status == 1){obj.Status = 'ОК'; obj.Color = 'green'}
+        else if (status == 2){obj.Status = 'перевантаження'; obj.Color = 'red'}
+        else if (status == 3) { obj.Status = "немає зв'язку"; obj.Color = 'orange' }
+        else if (status == 4) { obj.Status = "не активний"; obj.Color = 'grey' }
+        return obj;
+    }
+
+    function OnChangeJournalDateTime() {
+        UpdateEventsJournal();
+    }
+
+    function InfoSettingsLoad(apk) {
+        $('#APKListCombo').empty();
+        for (var i = 0; i < apk.length; i++) {
+            if (i == 0)
+                $("#APKListCombo").append(
+                    "<option selected>АПК №" + apk[i].Number + ' ' + apk[i].Name + "</option>"
+                );
+            else
+                $("#APKListCombo").append(
+                    "<option>АПК №" + apk[i].Number + ' ' + apk[i].Name + "</option>"
+                );
+        }
+        $('#APKMarkerIndexList').prop('disabled', 'disabled');
+        // показники в маркері
+        $('#APKMarkerIndexList').empty();
+        $("#APKMarkerIndexList").append(
+            "<option selected>Номер посту</option>" //номер посту
+        ); 
+        for (var i = 0; i < apk[active_mark].IndexNames.length; i++) {
+            $("#APKMarkerIndexList").append(
+                "<option>" + apk[active_mark].IndexNames[i] + "</option>"
+            );
+        }
+        // показники в контексті
+        $('#APKIndexesList').empty();
+        $('#APKIndexesList').append(
+            '<div class="div_State_div_1">' +
+            '<input type="checkbox" onchange="APKIndexClick(0)" class="myCheckBox" value="true" id="chkAPKIndex0" checked/>' +
+            '<label class="checkbox_lbl_typepost" runat="server">Назва посту</label>' +
+            '</div>' +
+            '<div class="div_State_div_2">' +
+            '<input type="checkbox" onchange="APKIndexClick(1)" class="myCheckBox" value="true" id="chkAPKIndex1" checked/>' +
+            '<label class="checkbox_lbl_typepost" runat="server">Номер посту</label>' +
+            '</div>'
+        );
+        for (var i = 0; i < apk[active_mark].IndexNames.length; i++) {
+            $('#APKIndexesList').append(
+                '<div class="div_State_div_' + ((i % 2) + 1) + '">' +
+                '<input type="checkbox" onchange="APKIndexClick(' + (i + 2) + ')" class="myCheckBox" value="true" id="chkAPKIndex' + (i + 2) + '" checked/>' +
+                '<label class="checkbox_lbl_typepost" runat="server">' + apk[active_mark].IndexNames[i] + '</label>' +
+                '</div>'
+            );
+        }
+        $('input.myCheckBox').prettyCheckable();
+        UpdateInfoWindowContent();
+    }
+
+    function UpdateInfoWindowContent() {
+        var contentText = "";//'<div style="max-height: 5px">';
+        for (var i = 0; i < apkes.length; i++) {
+            contentText = "";
+            if (apkes[i].IsIndexVisible[0])
+                contentText = contentText + 'Назва: ' + apkes[i].Name + "<br />";
+            if (apkes[i].IsIndexVisible[1])
+                contentText = contentText + 'Номер: ' + apkes[i].Number + "<br />";
+            for (var j = 0; j < apkes[i].IndexNames.length; j++) {
+                if (apkes[i].IsIndexVisible[j + 2])
+                    contentText = contentText + apkes[i].IndexNames[j] + ': ' + apkes[i].IndexValues[j] + apkes[i].IndexValuesName[j] + "<br />";
+            }
+            //contentText = contentText + "</div>";
+            infowindows[i].setContent(contentText);
+        }
+    }
+    
+    function APKIndexClick(number) {//вибір показників, які будуть показуватися в контексті
+        var apk_number = $("#APKListCombo")[0].selectedIndex;
+        apkes[apk_number].IsIndexVisible[number] = document.getElementById('chkAPKIndex' + number).checked;
+        UpdateInfoWindowContent();
+    }
+
+    function APKTypeClick(type) {
+        if ($("#chkAPKType" + type).is(':checked') == true) {
+            for (var i = 0; i < markers.length; i++) {
+                if (markers[i].metadata.type == type) {
+                    markers[i].metadata.setMapNullCounter = markers[i].metadata.setMapNullCounter - 1;
+                    //if (markers[i].metadata.setMapNullCounter == 0)
+                    if (markers[i].getMap() == null)
+                        markers[i].setMap(map);
+                }
+            }
+        }
+        else {
+            for (var i = 0; i < markers.length; i++) {
+                if (markers[i].metadata.type == type) {
+                    if (markers[i].getMap() != null)
+                        markers[i].setMap(null);
+                    markers[i].metadata.setMapNullCounter = markers[i].metadata.setMapNullCounter + 1;
+                }
+            }
+        }
+    }
+
+    function APKListComboChange() {
+        var number = $("#APKListCombo")[0].selectedIndex;
+        // показники в маркері
+        $('#APKMarkerIndexList').empty();
+        var selected = "";
+        if(markers[number].metadata.currentIndex == 0)
+            selected = " selected";
+        $("#APKMarkerIndexList").append(
+            "<option" + selected +">Номер посту</option>"
+        );
+        for (var i = 0; i < apkes[number].IndexNames.length; i++) {
+            selected = "";
+            if (markers[number].metadata.currentIndex == i + 1)
+                selected = " selected";
+            $("#APKMarkerIndexList").append(
+                "<option" + selected + ">" + apkes[number].IndexNames[i] + "</option>"
+            );
+        }
+        // показники в контексті
+        $('#APKIndexesList').empty();
+        var checked0 = apkes[number].IsIndexVisible[0] ? " checked" : "";
+        var checked1 = apkes[number].IsIndexVisible[1] ? " checked" : "";
+        $('#APKIndexesList').append(
+            '<div class="div_State_div_1">' +
+            '<input type="checkbox" onchange="APKIndexClick(0)" class="myCheckBox" value="true" id="chkAPKIndex0"' + checked0 + '/>' +
+            '<label class="checkbox_lbl_typepost" runat="server">Назва посту</label>' +
+            '</div>' +
+            '<div class="div_State_div_2">' +
+            '<input type="checkbox" onchange="APKIndexClick(1)" class="myCheckBox" value="true" id="chkAPKIndex1"' + checked1 + '/>' +
+            '<label class="checkbox_lbl_typepost" runat="server">Номер посту</label>' +
+            '</div>'
+        );
+        var checked3 = "";
+        for (var i = 0; i < apkes[number].IndexNames.length; i++) {
+            checked3 = apkes[number].IsIndexVisible[i + 2] ? " checked" : "";
+            $('#APKIndexesList').append(
+                '<div class="div_State_div_' + ((i % 2) + 1) + '">' +
+                '<input type="checkbox" onchange="APKIndexClick(' + (i + 2) + ')" class="myCheckBox" value="true" id="chkAPKIndex' + (i + 2) + '"' + checked3 + '/>' +
+                '<label class="checkbox_lbl_typepost" runat="server">' + apkes[number].IndexNames[i] + '</label>' +
+                '</div>'
+            );
+        }
+        $('input.myCheckBox').prettyCheckable();
+        UpdateInfoWindowContent();
+    }
+
+    function APKMarkerIndexComboChange() {
+        SetMarkerLabelContent($("#APKListCombo")[0].selectedIndex);
+        markers[$("#APKListCombo")[0].selectedIndex].metadata.currentIndex = $("#APKMarkerIndexList")[0].selectedIndex;
+    }
+
+    function SetMarkerLabelContent(number) {
+        var text = "";
+        
+        if ($("#APKMarkerIndexList")[0].selectedIndex == 0) 
+            text = '№' + apkes[number].Number;
+        for (var i = 1; i < $("select[id=APKMarkerIndexList] option").size() ; i++) {
+            if ($("#APKMarkerIndexList")[0].selectedIndex == i)
+                text = apkes[number].IndexValues[i - 1] + apkes[number].IndexValuesName[i - 1];
+        }
+        markers[number].labelAnchor = new google.maps.Point(15, 30);
+        markers[number].label.setAnchor();
+        markers[number].labelContent = text;
+        markers[number].label.setContent();
+    }
+
+    function AddEvent(desc1, date1) {
+        if (events.length < 99) {
+            var err = { desc: desc1, date: date1 };
+            events.push(err);
+        }
+        else {
+            for (var i = 0; i < events.length - 1; i++) {
+                events[i].desc = events[i + 1].desc;
+                //events[i].date = events[i + 1].date;
+                events[i].date.setFullYear(events[i + 1].date.getFullYear());
+                events[i].date.setMonth(events[i + 1].date.getMonth());
+                events[i].date.setDate(events[i + 1].date.getDate());
+                events[i].date.setHours(events[i + 1].date.getHours());
+                events[i].date.setMinutes(events[i + 1].date.getMinutes());
+            }
+
+            events[events.length - 1].desc = desc1;
+            events[events.length - 1].date.setFullYear(date1.getFullYear());
+            events[events.length - 1].date.setMonth(date1.getMonth());
+            events[events.length - 1].date.setDate(date1.getDate());
+            events[events.length - 1].date.setHours(date1.getHours());
+            events[events.length - 1].date.setMinutes(date1.getMinutes());
+        }
+    }
+
+    function CheckConnection() {
+        $.ajax({
+            type: 'GET',
+            dataType: 'json',
+            contentType: 'application/json',
+            async: false,
+            url: '@Url.Action("CheckDBEConnection", "Home")',
+            success: function (ok) {
+                if (ok == false) 
+                    AddEvent("Немає зв'язку з БД", new Date());
+            },
+            error: function () {
+                AddEvent("Немає мережевого зв'язку", new Date());
+            }
+            });
+    }
+
+    function CheckAPKForErrors(apk) {
+        for (var i = 0; i < apk.length; i++) {
+            if ((apk[i].Status != 0) && (apk[i].Status != 4))
+            for (var j = 0; j < apk[i].ParameterIDs.length; j++) {
+                //перевищення
+                if (apk[i].ParameterIDs[j] == 1) {//Оксид углерода CO
+                    for (var k = 0; k < apk[i].ParameterIDs.length; k++) {
+                        if ((apk[i].ParameterIDs[k] == 29) && (apk[i].IndexValues[j] > apk[i].IndexValues[k])) { //vagco2
+                            AddEvent("Перевищення значення параметру '" + apk[i].IndexNames[j] + "' постy №" + apk[i].Number, new Date());
+                            apk[i].Status = 2;
+                        }
+                        if ((apk[i].ParameterIDs[k] == 30) && (apk[i].IndexValues[j] < apk[i].IndexValues[k])) {//nagco2
+                            AddEvent("Значення параметру '" + apk[i].IndexNames[j] + "' постy №" + apk[i].Number + "нижче рівня", new Date());
+                            apk[i].Status = 2;
+                        }
+                    }
+                }
+                else if (apk[i].ParameterIDs[j] == 2) {//Азота диоксид NO2
+                    for (var k = 0; k < apk[i].ParameterIDs.length; k++) {
+                        if ((apk[i].ParameterIDs[k] == 33) && (apk[i].IndexValues[j] > apk[i].IndexValues[k])) {//vagno2
+                            AddEvent("Перевищення значення параметру '" + apk[i].IndexNames[j] + "' постy №" + apk[i].Number, new Date());
+                            apk[i].Status = 2;
+                        }
+                        if ((apk[i].ParameterIDs[k] == 34) && (apk[i].IndexValues[j] < apk[i].IndexValues[k])) {//nagno2
+                            AddEvent("Значення параметру '" + apk[i].IndexNames[j] + "' постy №" + apk[i].Number + "нижче рівня", new Date());
+                            apk[i].Status = 2;
+                        }
+                    }
+                }
+                else if (apk[i].ParameterIDs[j] == 3) {//Серы диоксид SO2
+                    for (var k = 0; k < apk[i].ParameterIDs.length; k++) {
+                        if ((apk[i].ParameterIDs[k] == 31) && (apk[i].IndexValues[j] > apk[i].IndexValues[k])) { //vagso2
+                            AddEvent("Перевищення значення параметру '" + apk[i].IndexNames[j] + "' постy №" + apk[i].Number, new Date());
+                            apk[i].Status = 2;
+                        }
+                        if ((apk[i].ParameterIDs[k] == 32) && (apk[i].IndexValues[j] < apk[i].IndexValues[k])) { //nagso2
+                            AddEvent("Значення параметру '" + apk[i].IndexNames[j] + "' постy №" + apk[i].Number + "нижче рівня", new Date());
+                            apk[i].Status = 2;
+                        }
+                    }
+                }
+                else if (apk[i].ParameterIDs[j] == 4) {//TEMP
+                    for (var k = 0; k < apk[i].ParameterIDs.length; k++) {
+                        if ((apk[i].ParameterIDs[k] == 35) && (apk[i].IndexValues[j] > apk[i].IndexValues[k])){
+                            AddEvent("Перевищення значення параметру '" + apk[i].IndexNames[j] + "' постy №" + apk[i].Number, new Date());
+                            apk[i].Status = 2;
+                        }
+                        if ((apk[i].ParameterID[k] == 36) && (apk[i].IndexValues[j] < apk[i].IndexValues[k])){
+                            AddEvent("Значення параметру '" + apk[i].IndexNames[j] + "' постy №" + apk[i].Number + "нижче рівня", new Date());
+                            apk[i].Status = 2;
+                        }
+                    }
+                }
+                else if (apk[i].ParameterIDs[j] == 19) {//BDM
+                    for (var k = 0; k < apk[i].ParameterIDs.length; k++) {
+                        if ((apk[i].ParameterIDs[k] == 23) && (apk[i].IndexValues[j] > apk[i].IndexValues[k])){
+                            AddEvent("Перевищення значення параметру '" + apk[i].IndexNames[j] + "' постy №" + apk[i].Number, new Date());
+                            apk[i].Status = 2;
+                        }
+                        if ((apk[i].ParameterIDs[k] == 24) && (apk[i].IndexValues[j] < apk[i].IndexValues[k])){ 
+                            AddEvent("Значення параметру '" + apk[i].IndexNames[j] + "' постy №" + apk[i].Number + "нижче рівня", new Date());
+                            apk[i].Status = 2;
+                        }
+                    }
+                }
+                //безпека
+                else if ((apk[i].ParameterIDs[j] == 5) && (apk[i].IndexValues[j] == 1)){ //Задымление поста
+                    AddEvent("Задимлення постy №" + apk[i].Number, new Date());
+                    apk[i].Status = 2;
+                }
+                else if ((apk[i].ParameterIDs[j] == 6) && (apk[i].IndexValues[j] == 1)) { //Вскрытие поста
+                    AddEvent("Взламування постy №" + apk[i].Number, new Date());
+                    apk[i].Status = 2;
+                }
+                else if ((apk[i].ParameterIDs[j] == 37) && (apk[i].IndexValues[j] == 1)) { //Датчик открытия шкафа
+                    AddEvent("Відкрита шафа постy №" + apk[i].Number, new Date());
+                    apk[i].Status = 2;
+                }
+                else if ((apk[i].ParameterIDs[j] == 39) && (apk[i].IndexValues[j] == 1)) { //Питания от аккумулятора
+                    AddEvent("Живлення від акумулятора постy №" + apk[i].Number, new Date());
+                    apk[i].Status = 2;
+                }
+                else if ((apk[i].ParameterIDs[j] == 40) && (apk[i].IndexValues[j] == 1)) { //Датчик движения
+                    AddEvent("Спрацював датчик руху постy №" + apk[i].Number, new Date());
+                    apk[i].Status = 2;
+                }
+                else if ((apk[i].ParameterIDs[j] == 41) && (apk[i].IndexValues[j] == 1)) { //Датчик давления
+                    AddEvent("Спрацював датчик тиску постy №" + apk[i].Number, new Date());
+                    apk[i].Status = 2;
+                }
+            }
+        }
+    }
+
+    function StatusRefresh() {
+        $.ajax({
+            type: 'GET',
+            dataType: 'json',
+            contentType: 'application/json',
+            async: false,
+            url: '@Url.Action("GenerateAPK", "Home")',
+            data: { all: true, id: 0 },
+            success: function (apk) {
+                //var apkes2 = [];
+                var UpdateAny;
+                var SecurityStatus = 1;
+                for (var i = 0; i < apk.length; i++) {
+                    UpdateAny = false;
+                    if ((apk[i].Status != 0) && (apk[i].Status != 4))
+                    for (var j = 0; j < apk[i].ParameterIDs.length; j++) {
+                        //перевищення
+                        if (apk[i].ParameterIDs[j] == 1) {//Оксид углерода CO
+                            for (var k = 0; k < apk[i].ParameterIDs.length; k++)
+                            {
+                                if ((apk[i].ParameterIDs[k] == 29) && (apk[i].IndexValues[j] > apk[i].IndexValues[k])){ //vagco2
+                                    AddEvent("Перевищення значення параметру '" + apkes[i].IndexNames[j] + "' постy №" + apkes[i].Number, new Date());
+                                    apk[i].Status = 2;
+                                    SecurityStatus = apk[i].Status;
+                                }
+                                if ((apk[i].ParameterIDs[k] == 30) && (apk[i].IndexValues[j] < apk[i].IndexValues[k])){ //nagco2
+                                    AddEvent("Значення параметру '" + apkes[i].IndexNames[j] + "' постy №" + apkes[i].Number + "нижче рівня", new Date());
+                                    apk[i].Status = 2;
+                                    SecurityStatus = apk[i].Status;
+                                }
+                            }
+                        }
+                        else if (apk[i].ParameterIDs[j] == 2) {//Азота диоксид NO2
+                            for (var k = 0; k < apk[i].ParameterIDs.length; k++) {
+                                if ((apk[i].ParameterIDs[k] == 33) && (apk[i].IndexValues[j] > apk[i].IndexValues[k])){ //vagno2
+                                    AddEvent("Перевищення значення параметру '" + apkes[i].IndexNames[j] + "' постy №" + apkes[i].Number, new Date());
+                                    apk[i].Status = 2;
+                                    SecurityStatus = apk[i].Status;
+                                }
+                                if ((apk[i].ParameterIDs[k] == 34) && (apk[i].IndexValues[j] < apk[i].IndexValues[k])){ //nagno2
+                                    AddEvent("Значення параметру '" + apkes[i].IndexNames[j] + "' постy №" + apkes[i].Number + "нижче рівня", new Date());
+                                    apk[i].Status = 2;
+                                    SecurityStatus = apk[i].Status;
+                                }
+                            }
+                        }
+                        else if (apk[i].ParameterIDs[j] == 3) {//Серы диоксид SO2
+                            for (var k = 0; k < apk[i].ParameterIDs.length; k++) {
+                                if ((apk[i].ParameterIDs[k] == 31) && (apk[i].IndexValues[j] > apk[i].IndexValues[k])){ //vagso2
+                                    AddEvent("Перевищення значення параметру '" + apkes[i].IndexNames[j] + "' постy №" + apkes[i].Number, new Date());
+                                    apk[i].Status = 2;
+                                    SecurityStatus = apk[i].Status;
+                                }
+                                if ((apk[i].ParameterIDs[k] == 32) && (apk[i].IndexValues[j] < apk[i].IndexValues[k])){ //nagso2
+                                    AddEvent("Значення параметру '" + apkes[i].IndexNames[j] + "' постy №" + apkes[i].Number + "нижче рівня", new Date());
+                                    apk[i].Status = 2;
+                                    SecurityStatus = apk[i].Status;
+                                }
+                            }
+                        }
+                        else if (apk[i].ParameterIDs[j] == 4) {//TEMP
+                            for (var k = 0; k < apk[i].ParameterIDs.length; k++) {
+                                if ((apk[i].ParameterIDs[k] == 35) && (apk[i].IndexValues[j] > apk[i].IndexValues[k])){
+                                    AddEvent("Перевищення значення параметру '" + apkes[i].IndexNames[j] + "' постy №" + apkes[i].Number, new Date());
+                                    apk[i].Status = 2;
+                                    SecurityStatus = apk[i].Status;
+                                }
+                                if ((apk[i].ParameterIDs[k] == 36) && (apk[i].IndexValues[j] < apk[i].IndexValues[k])){ 
+                                    AddEvent("Значення параметру '" + apkes[i].IndexNames[j] + "' постy №" + apkes[i].Number + "нижче рівня", new Date());
+                                    apk[i].Status = 2;
+                                    SecurityStatus = apk[i].Status;
+                                }
+                            }
+                        }
+                        else if (apk[i].ParameterIDs[j] == 19) {//BDM
+                            for (var k = 0; k < apk[i].ParameterIDs.length; k++) {
+                                if ((apk[i].ParameterIDs[k] == 23) && (apk[i].IndexValues[j] > apk[i].IndexValues[k])){
+                                    AddEvent("Перевищення значення параметру '" + apkes[i].IndexNames[j] + "' постy №" + apkes[i].Number, new Date());
+                                    apk[i].Status = 2;
+                                    SecurityStatus = apk[i].Status;
+                                }
+                                if ((apk[i].ParameterIDs[k] == 24) && (apk[i].IndexValues[j] < apk[i].IndexValues[k])){
+                                    AddEvent("Значення параметру '" + apkes[i].IndexNames[j] + "' постy №" + apkes[i].Number + "нижче рівня", new Date());
+                                    apk[i].Status = 2;
+                                    SecurityStatus = apk[i].Status;
+                                }
+                            }
+                        }
+                        //безпека
+                        else if ((apk[i].ParameterIDs[j] == 5) && (apk[i].IndexValues[j] == 1)){ //Задымление поста
+                            AddEvent("Задимлення постy №" + apkes[i].Number, new Date());
+                            apk[i].Status = 2;
+                            SecurityStatus = apk[i].Status;
+                        }
+                        else if ((apk[i].ParameterIDs[j] == 6) && (apk[i].IndexValues[j] == 1)){ //Вскрытие поста
+                            AddEvent("Взламування постy №" + apkes[i].Number, new Date());
+                            apk[i].Status = 2;
+                            SecurityStatus = apk[i].Status;
+                        }
+                        else if ((apk[i].ParameterIDs[j] == 37) && (apk[i].IndexValues[j] == 1)){ //Датчик открытия шкафа
+                            AddEvent("Відкрита шафа постy №" + apkes[i].Number, new Date());
+                            apk[i].Status = 2;
+                            SecurityStatus = apk[i].Status;
+                        }
+                        else if ((apk[i].ParameterIDs[j] == 39) && (apk[i].IndexValues[j] == 1)){ //Питания от аккумулятора
+                            AddEvent("Живлення від акумулятора постy №" + apkes[i].Number, new Date());
+                            apk[i].Status = 2;
+                            SecurityStatus = apk[i].Status;
+                        }
+                        else if ((apk[i].ParameterIDs[j] == 40) && (apk[i].IndexValues[j] == 1)){ //Датчик движения
+                            AddEvent("Спрацював датчик руху постy №" + apkes[i].Number, new Date());
+                            apk[i].Status = 2;
+                            SecurityStatus = apk[i].Status;
+                        }
+                        else if ((apk[i].ParameterIDs[j] == 41) && (apk[i].IndexValues[j] == 1)) { //Датчик давления
+                            AddEvent("Спрацював датчик тиску постy №" + apkes[i].Number, new Date());
+                            apk[i].Status = 2;
+                            SecurityStatus = apk[i].Status;
+                        }
+
+                        //звязок з постом
+                        //if (j < apkes[i].ParameterIDs.length) {
+                        if (UpdateAny == false) {
+                            if (apkes[i].IndexIdQuery[j] == apk[i].IndexIdQuery[j]) {
+                                AddEvent("Не оновилося значення параметру '" + apkes[i].IndexNames[j] + "' постy №" + apkes[i].Number, new Date());
+                                apk[i].Status = 3;
+                            }
+                            else {
+                                UpdateAny = true;
+                                apk[i].Status = SecurityStatus;
+                            }
+                        }
+                            
+                       // }
+                    }
+                    
+                    markers[i].metadata.status = apk[i].Status;
+                    if (i != active_mark) {
+                        if ($('#markerTypeCombo')[0].selectedIndex == 0) {
+                            markers[i].setIcon('../Content/img/smarker_' + markers[i].metadata.status + '.png');
+                        }
+                        else {
+                            markers[i].setIcon('../Content/img/marker_' + markers[i].metadata.status + '.png');
+                        }
+                    }
+                }
+
+                for (var i = 0; i < apkes.length; i++) {
+                    apk[i].IsIndexVisible[0] = apkes[i].IsIndexVisible[0];
+                    apk[i].IsIndexVisible[1] = apkes[i].IsIndexVisible[1];
+                    for (var j = 0; j < apkes[i].IsIndexVisible.length - 2; j++) {
+                        if (apkes[i].IsIndexVisible[j + 2] == false) {
+                            //console.log('Параметр з ІД ' + apkes[i].ParameterIDs[j - 2] + ' та імям ' + apkes[i].IndexNames[j - 2] + ' не відображається в контексті');
+                            //console.log('починаємо перебирати параметри, що прийшли');
+                            for (var k = 0; k < apk[i].IsIndexVisible.length - 2; k++) {//для кожного параметру із нових АПК перевіряємо відповідність старим параметрам
+                                if (apk[i].ParameterIDs[k] == apkes[i].ParameterIDs[j]) {
+                                    //console.log('apk[i].ParameterIDs[' + k + '] = ' + apk[i].IndexNames[k]);
+                                    apk[i].IsIndexVisible[k + 2] = false;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                apkes = [];
+
+                for (var i = 0; i < apk.length; i++) {
+                    apkes.push(apk[i]);
+                }
+
+                //InfoSettingsLoad(apkes);
+                InitAPKInfo();
+                CheckMarkersForVisualiationByStatus();
+                UpdateInfoWindowContent();
+                UpdateFooter();
+            }
+        })
+    }
+    
+    function UpdateFooter() {
+        $("#layout_footer").empty();
+        $("#layout_footer").append("<ul>");
+        for (var i = 0; i < apkes.length; i++) {
+            var status = "";
+            if (apkes[i].Status == 0)
+                status = "в ремонті";
+            else if (apkes[i].Status == 1)
+                status = "в нормі";
+            else if (apkes[i].Status == 2)
+                status = "перевищення критичного рівня";
+            else if (apkes[i].Status == 3)
+                status = "немає зв’язку";
+            else if (apkes[i].Status == 4)
+                status = "не активний";
+            var contact = "[Контактні дані відсутні]";
+            if (apkes[i].ContactInfo != null)
+                contact = apkes[i].ContactInfo;
+            var CO2 = "CO2 відсутній"; var SO2 = "SO2 відсутній"; var NO2 = "NO2 відсутній";
+            for (var j = 0; j < apkes[i].ParameterIDs.length; j++) {
+                if (apkes[i].ParameterIDs[j] == 1)
+                    CO2 = "CO2 = " + apkes[i].IndexValues[j] + "мг/м3";
+                else if (apkes[i].ParameterIDs[j] == 2)
+                    NO2 = "NO2 = " + apkes[i].IndexValues[j] + "мг/м3";
+                else if (apkes[i].ParameterIDs[j] == 3)
+                    SO2 = "SO2 = " + apkes[i].IndexValues[j] + "мг/м3";
+            }
+            $("#layout_footer").append("<li style='margin-left: 10px; margin-top: 10px;'>АПК номер " + apkes[i].Number +
+                " - " + status + " - " + contact + " - " + CO2 + " - " + SO2 + " - " + NO2 + "</li>");
+        }
+        $("#layout_footer").append("</ul>");
+    }
+
+    function CheckMarkersForVisualiationByStatus() {
+        APKTypeStatusClick('#active', 1);
+        APKTypeStatusClick('#repair', 0);
+        APKTypeStatusClick('#over', 2);
+        APKTypeStatusClick('#noconnection', 3);
+        APKTypeStatusClick('#inactive', 4);
+    }
+
+    function UpdateEventsJournal() {
+        if (document.getElementById('JournalDateFrom').value != '') {
+            $('#eventJournal').empty();
+            for (var i = 0; i < events.length; i++) {
+                var date = new Date(document.getElementById('JournalDateFrom').value + ' ' + document.getElementById('JournalTimeFrom').value);
+                if (events[i].date > date) {
+                    var color = "background: white";
+                    if (i % 2 == 0)
+                        color = "background: #F8F8F8";
+                    $('#eventJournal').append(
+                        '<p class="journalDesc" style="font-size: 14px;' + color + '">' + events[i].desc + '</p>' +
+                        '<p class="journalDate" style="font-size: 12px; font-style: italic;' + color + '">' +
+                        ("0" + events[i].date.getDate()).slice(-2) + '.' + ("0" + (events[i].date.getMonth() + 1)).slice(-2) + '.' +
+                        events[i].date.getFullYear() + '  ' + ("0" + events[i].date.getHours()).slice(-2) + ':' + ("0" + events[i].date.getMinutes()).slice(-2) + '</p>'
+                    );
+                }
+            }
+        }
+    }
+
+    function refreshPeriodChange() {
+        clearTimeout(RefreshAPKTimer);
+        var period = $('#refreshPeriod').val();
+        if (period < 1) {
+            period = 1;
+            $('#refreshPeriod').val(period);
+        }
+        RefreshAPKTimer = setInterval(function () {
+            CheckConnection();
+            StatusRefresh();
+            UpdateEventsJournal();
+        }, 1000 * 60 * period);
+    }
+
+    function ChangeAutoCloseContext() {
+        autoCloseContext = $("#autoCloseContext").is(':checked');
+        if (autoCloseContext == true) {
+            for (var i = 0; i < infowindows.length; i++) {
+                if(i != active_mark)
+                    infowindows[i].close();
+            }
+        }
+    }
+
+    function ChangeAutoChangeContext() {
+        var change = $("#autoChangeContext").is(':checked');
+        if (change == true) {
+
+            var period = $('#changeContextPeriod').val();
+            CloseAllInfoWindows();
+
+            //для початку встановимо перший активний контекст
+            for (var i = 0; i < markers.length; i++) {
+                if ((markers[currentAPKforAutoChangeContext].metadata.status == 1) ||
+                    (markers[currentAPKforAutoChangeContext].metadata.status == 2) ||
+                    (markers[currentAPKforAutoChangeContext].metadata.status == 3)) {
+                    SetActiveMarker(markers[currentAPKforAutoChangeContext].metadata.id);
+                    map.panTo(markers[currentAPKforAutoChangeContext].getPosition());
+                    infowindows[currentAPKforAutoChangeContext].open(map, markers[currentAPKforAutoChangeContext]);
+                    InitAPKInfo();
+                    break;
+                }
+                else {
+                    currentAPKforAutoChangeContext = currentAPKforAutoChangeContext + 1;
+                    if (currentAPKforAutoChangeContext >= markers.length)
+                        currentAPKforAutoChangeContext = 0;
+                }
+            }
+            //тепер запустимо таймер
+            SetChangeContextTimer(period);
+        }
+        else {
+            clearTimeout(AutoChangeContextTimer);
+            currentAPKforAutoChangeContext = 0;
+        }
+    }
+    
+    function CloseAllInfoWindows() {
+        for (var i = 0; i < infowindows.length; i++) {
+            infowindows[i].close();
+        }
+    }
+
+    function changeContextPeriodChange() {
+        clearTimeout(AutoChangeContextTimer);
+        var period = $('#changeContextPeriod').val();
+        if (period < 1) {
+            period = 1;
+            $('#changeContextPeriod').val(period);
+        }
+        SetChangeContextTimer(period);
+    }
+
+    function SetChangeContextTimer(period) {
+        AutoChangeContextTimer = setInterval(function () {
+            infowindows[currentAPKforAutoChangeContext].close();//закриваємо попередній контекст
+            currentAPKforAutoChangeContext = currentAPKforAutoChangeContext + 1;//шукаємо наступний пост
+            if (currentAPKforAutoChangeContext >= markers.length)
+                currentAPKforAutoChangeContext = 0;
+            for (var i = 0; i < markers.length; i++) {
+                if ((markers[currentAPKforAutoChangeContext].metadata.status == 1) ||
+                    (markers[currentAPKforAutoChangeContext].metadata.status == 2) ||
+                    (markers[currentAPKforAutoChangeContext].metadata.status == 3)) {
+                    SetActiveMarker(markers[currentAPKforAutoChangeContext].metadata.id);
+                    map.panTo(markers[currentAPKforAutoChangeContext].getPosition());
+                    infowindows[currentAPKforAutoChangeContext].open(map, markers[currentAPKforAutoChangeContext]);
+                    InitAPKInfo();
+                    break;
+                }
+                else {
+                    currentAPKforAutoChangeContext = currentAPKforAutoChangeContext + 1;
+                    if (currentAPKforAutoChangeContext >= markers.length)
+                        currentAPKforAutoChangeContext = 0;
+                }
+            }
+        }, 1000 * 60 * period);
+    }
+
+    window.onload = InitializeMap;  
+</script>
+@*@using (Html.BeginForm("LogOff", "Account", FormMethod.Post))
+{ 
+  <input type="submit" value="Inscription" /> 
+}*@
+ <div id="Div_Map" style="background-color: Aqua">
+    <div id="Div_Map_Menu">
+         <!-- кнопки над картою зліва-->
+        @*<div style="float: left; clear: right;">
+            <input type="image" class="img_map_menu_Button" src="~/Content/img/map_1_finger.png"
+                style="margin-left: 17px;" />
+            <input type="image" class="img_map_menu_Button" src="~/Content/img/map_2_triangle.png" />
+            <input type="image" class="img_map_menu_Button" src="~/Content/img/map_3_settings.png" />
+            <input type="image" class="img_map_menu_Button" src="~/Content/img/map_4_radio.png" />
+        </div>*@
+        
+        <div style="background-color: Fuchsia; display: block; height: 40px; width: auto;
+            float: left; clear: right;">
+        </div>
+        <div style="float: right; overflow: visible; height: 40px;">
+            @*<input type="image" onclick="javascript:zoom(true)" class="img_map_menu_Button" src="~/Content/img/map_6_zoom_plus.png" />
+            <input type="image" onclick="zoom(false)" class="img_map_menu_Button" src="~/Content/img/map_7_zoom_minus.png" />*@
+            <input type="image" onclick="map.panTo(markers[active_mark].getPosition());" class="img_map_menu_Button" src="~/Content/img/map_8_centering.png" style="margin-left: 17px;" />
+            
+            <input type="image" onclick="full_screen(true);" class="img_map_menu_Button" src="~/Content/img/map_9_full_screen.png" style="margin-left: 17px;" />
+            
+            @*<input type="image" class="img_map_menu_Button" src="~/Content/img/map_16_map.png" style="margin-left: 17px;" />*@
+            <img id="btn_hide_show_accordion" class="shadow" src="~/Content/img/accordion_17_hide.png" onclick="f_hide_show_accordion();" />
+            <div class="demo shadow" id="div_demo">
+                <div style="height: 40px; padding: 0px; margin: 0px;" class="div_search">
+                    <div>
+                        <select id="tbx_search_select">
+                            <!--<option selected="selected" value="0">Вул.</option>-->
+                            <option selected="selected" value="0">№</option>
+                            <option value="1">Наз.</option>
+                        </select>
+                        <input type="text" id="tbx_search" />
+                        <img onclick="javascript:tbx_search_click()" src="~/Content/img/accordion_1_search.png" alt="Пошук постів в СКЕМД" />
+                        <script>
+                            function tbx_search_click() {
+                                $.ajax({
+                                    type: 'GET',
+                                    dataType: 'json',
+                                    contentType: 'application/json',
+                                    data: { byWhom: $("#tbx_search_select").val(), what: $("#tbx_search").val() },
+                                    url: '@Url.Action("APKSearch", "Home")',
+                                    success: function (result) {
+                                        if (result == '-1')
+                                            alert("Поста з таким номером(ім'ям) не існує!");
+                                        else
+                                            SetActiveMarker(result.APKID);
+                                    }
+                                })
+                            }
+                        </script>
+                    </div>
+                </div>
+                @Html.Partial("_Accordeon", Model)
+            </div>
+            <!-- End demo -->
+        </div> <!-- кнопки над картою справа-->
+    </div>
+     
+     <input type="image" id="btn_fullscreen" class="shadow" src="~/Content/img/map_10_full_screen.png" style="float:right; position:absolute; top:0px; right: 0; z-index:9;"
+        onclick="full_screen(false);" />
+    
+     <div id="GMap1" style="width:100%;background:#ffe" class="map_canvas">
+    </div>
+</div>
+
+<!-- custom scrollbars plugin -->
+@Scripts.Render("~/js/scroll")
+

@@ -1,0 +1,100 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head runat="server">
+    <title>@ViewBag.Title</title>
+    @Styles.Render("~/Content/css")
+    @Scripts.Render("~/js/jq")
+    @Scripts.Render("~/js/skemd")
+    
+    <style type="text/css">
+        .css_content_1, .css_content_accordion
+        {
+            width: 330px;
+            height: 200px;
+            overflow: auto;
+            margin-left: -10px;
+        }
+        .loading
+        {
+            opacity: 0.3;
+        }
+    </style>
+</head>
+<body>
+    @*<form id="frm_main" runat="server">*@
+    @*<div class="wrapper">*@
+        <header>
+            <img src="~/Content/img/header_1_logo.png" id="img_header_logo" />
+            
+            <div id="img_header_title">
+                <label>
+                    Система комплексного екологічного</label>
+                <div style="height: 4px;">
+                </div>
+                <label>
+                    моніторингу м.Дніпродзержинськ</label>
+            </div>
+            <ul id="ul_header_menu">
+                <li onclick="window.location ='@Url.Action("Index")'" class="ul_li_border selected">
+                    <div>
+                    </div>
+                    <a href="../Home/Index">Моніторинг постів</a></li>
+                <li onclick="window.location ='@Url.Action("Graph")'" class="ul_li_border">
+                    <div>
+                    </div>
+                   <a href="../Home/Graph">Графіки та таблиці</a></li>
+                <li onclick="window.location ='@Url.Action("Help")'" class="ul_li_border">
+                    <div>
+                    </div>
+                    <a href="../Home/Help">Довідка</a></li>
+                <li onclick="window.location ='@Url.Action("Developer")'" class="ul_li_border">
+                    <div>
+                    </div>
+                    <a href="../Home/Developer">Розробник</a></li>
+                <li onclick="window.location ='@Url.Action("ContactInfo")'" class="ul_li_border">
+                    <div>
+                    </div>
+                    <a href="../Home/ContactInfo">Контактна інформація</a></li>
+                <!--<li>
+                    <div>
+                    </div>
+                    <label style="border: none;">
+                        Контакти</label></li> -->
+                @*<li class="ul_li_border">
+                    <div>
+                        @Html.Partial("_LoginPartial")
+                    </div>
+                </li>*@
+            </ul>
+            @using (Html.BeginForm("LogOff", "Account", FormMethod.Post, new { id = "logoutForm", style = "height: 100%" }))
+            {
+                @Html.AntiForgeryToken()
+                <a href="javascript:document.getElementById('logoutForm').submit()" class="logouttext">
+                    <span id="user" class="simpletext"></span><span class="simpletext"> </span><span style="font-size: 20px" class="icon">»</span>
+                </a>
+                <script>
+                    $(document).ready(function () {
+                        $.ajax({
+                        type: "GET",
+                        dataType: 'json',
+                        contentType: 'application/json',
+                        url: '@Url.Action("GetActiveUser", "Account")',
+                        success: function (user) {
+                                    $('#user').html(user.activeuser);
+                                }
+                        })
+                    });
+                </script>
+            }
+        </header>
+        <div class="content">
+            @RenderBody()
+            @RenderSection("scripts", required: false)
+        </div>
+    @*</div>*@
+    @*</form>*@
+    <footer>
+		<p><font color="white">FOOTER</font></p>
+	</footer>
+</body>
+</html>

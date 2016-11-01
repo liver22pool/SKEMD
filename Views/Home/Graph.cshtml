@@ -1,0 +1,533 @@
+﻿@{
+    ViewBag.Title = "Graph";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+@model SKEMD_WWW.Models.GraphValidationModel
+
+<script>
+    $('#ul_header_menu2 li').removeClass("current"); // удаляем у всех ссылок класс selected
+    $('#header_li_graph').addClass("current"); // устанавливаем класс active при нажатии
+</script>
+
+<link href="~/Content/ReportStyle.css" rel="stylesheet"/>
+
+<fieldset class="graphParamsFieldset" id="graphParamsFieldsetDate" style="float:left; margin-left: 15px;">
+    <legend>Вибір дати</legend>
+    <div class="div_datetimepicker">
+        <label for="from_">з&nbsp;&nbsp;</label><img src="../../Content/img/accordion_10_date.png" />
+        @Html.EditorFor(m => m.DateFrom) @*<input type="text" id="from_" name="from_"/>*@
+        @*<label style="width:5px;"></label><img src="../../Content/img/accordion_11_time.png" />
+        @Html.EditorFor(m => m.TimeFrom) @*<input type="text" id="from_time_" />*@
+        <div style="clear:left; height:10px;"></div>
+        <label for="to_">по</label><img src="../../Content/img/accordion_10_date.png" />
+        @Html.EditorFor(m => m.DateTo) @*<input type="text" id="to_" name="to_"/>*@
+        @*<label style="width:5px;"></label><img src="../../Content/img/accordion_11_time.png" />
+        @Html.EditorFor(m => m.TimeTo) @*<input type="text" id="to_time_" />*@
+    </div>
+</fieldset>
+<fieldset id="graphParamsEditors" class="graphParamsFieldset" style="float:right; margin-right: 15px;">
+    <legend>Параметри АПК</legend>
+
+    <div style="position: relative; ">
+        <label style="position: absolute; top:50%; margin-top: -0.625em; font-size: 16px;">Вибір АПК:  </label>
+        @*<select id="APKListBox_Graph" multiple="multiple" style="height: 75px; margin-left: 127px; width: 150px;"></select>*@
+        <div id="div_APKListBox_Graph" style="height: 75px; margin-left: 127px; width: 250px; line-height: 75px;"></div>
+    </div>
+    <div>
+        <label style="font-size: 16px;">Вибір показників:  </label>
+        <select id="APKComboIndexes_Graph" style="width: 250px;"></select>
+    </div>
+</fieldset>
+
+<div style="clear:both;"></div>
+
+@Scripts.Render("~/bundles/tabs")
+
+<div id="pagecontent" style="position:absolute; left: 15px; top: 175px; bottom: 0; right: 15px;">
+
+    @*<div>@ViewBag.FromAccordeon</div>*@
+    
+    <ul class="tabset_tabs">
+    	<li class="firstchild"><a href="#graph" class="preActive active">Графік</a></li>
+        <li><a class="preActive postActive" href="#table">Таблиця</a></li>
+    </ul>
+    
+    <div id="graph" class="tabset_content tabset_content_active">
+    	<div id="visualization"></div>
+        <button id="buildGraph" class="fineButton">Побудувати графік</button> 
+        <img id="loading_img" style="display: none;" src='@Url.Content("~/Content/img/ajax-loader.gif")' />
+        
+        <button id="saveGraphToPDF" class="fineButton" onclick="genPDF()">Експорт в PDF</button>
+        <button id="saveGraphToXLS" class="fineButton" onclick="genXLS()">Експорт в XLS</button>
+        <button id="saveGraphToIMG" class="fineButton" onclick="genPNG()">Експорт в PNG</button>
+        <a id="hidden_a"></a>
+
+    </div>
+    	
+    <div id="table" class="tabset_content" style="overflow:auto;">
+    	<table id="graph_table"></table>
+        <button id="saveTableToPDF" class="fineButton" onclick="genTabPDF()">Експорт в PDF</button>
+        <button id="saveTableToXLS" class="fineButton" onclick="genTabXLS()">Експорт в XLS</button>
+        <button id="saveTableToIMG" class="fineButton" onclick="genTabPNG()">Експорт в PNG</button>
+        <a id="hidden_a_table"></a>
+
+    </div>
+</div>
+
+
+@*<div id="visualization"></div>*@
+
+<script src="~/Scripts/jspdf.js"></script>
+<script src="~/Scripts/html2canvas.js"></script>
+
+@*<script type="text/javascript" src="//www.google.com/jsapi"></script>*@
+<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+
+<script type="text/javascript">
+    
+    //google.load('visualization', '1', { packages: ['corechart'] });
+    google.charts.load('current', {packages: ['corechart', 'line']});
+    var glob_graph;
+    $(document).ready(function () {
+        var modl = @Html.Raw(Json.Encode(Model));
+        var idx = 0; 
+        $.ajax({ //fill APKs
+            url: '@Url.Action("GetAPK")',
+            dataType: 'json',
+            data: { all: true, id: 0 },
+            contentType: 'application/json',
+            success: function (lst){
+                $("#div_APKListBox_Graph").empty();
+                //$("#APKListBox_Graph").attr("size", lst.length);
+                if (modl == null) {
+                    $("#div_APKListBox_Graph").append('<select id="APKListBox_Graph" multiple="multiple" style="width: 100%"></select>');
+                    var IsSelected = false;
+                    for (var i = 0; i < lst.length; i++) {
+                        if(lst[i].Type == 0 || lst[i].Type == 5)//газоаналізатор
+                        {
+                            if(IsSelected == false){
+                                $("#APKListBox_Graph").append(
+                                "<option selected value=" + lst[i].ID  + ">АПК№" + lst[i].Number + ' ' + lst[i].Name + "</option>"
+                                );
+                                IsSelected = true;
+                                idx = i;
+                            }
+                            else{
+                                $("#APKListBox_Graph").append(
+                                    "<option value=" + lst[i].ID  + ">АПК№" + lst[i].Number + ' ' + lst[i].Name + "</option>"
+                                );
+                            }
+                        }
+                    }
+                }
+                else {
+                    $('#graphParamsEditors').empty();
+                    $('#graphParamsEditors').append('<legend>Параметри АПК</legend>');
+                    for (var i = 0; i < lst.length; i++) {
+                        if (lst[i].ID == modl.APKID) {
+                            $("#graphParamsEditors").append("АПК№" + lst[i].Number + ' ' + lst[i].Name);
+                            idx = i;
+                            break;
+                        }
+                    }
+                    $('#graphParamsEditors').append('<div style="height: 5px"></div>');
+                }
+          
+                if (modl != null){
+                    $.ajax({ //fill Params
+                        url: '@Url.Action("GetAPKParameterNamesForGraph")',
+                        dataType: 'json',
+                        data: { APKNumber: idx },
+                        contentType: 'application/json',
+                        success: function (res) {
+                            $("#graphParamsEditors").append('<div id="div_Indexes" style="position: relative; "><label style="position: absolute; top:50%; margin-top: -0.625em; font-size: 16px;">Вибір показника:  </label>');
+                            $("#div_Indexes").append('<select id="APKComboIndexes_Graph" multiple="multiple" style="height: 80px; margin-left: 127px; width: 250px;"></select></div>');
+                            for (var i = 0; i < res.IDs.length; i++) {
+                                if (i == 0)
+                                    $("#APKComboIndexes_Graph").append(
+                                        "<option selected value=" + res.IDs[i] + ">" + res.Names[i] + "</option>"
+                                    );
+                                else
+                                    $("#APKComboIndexes_Graph").append(
+                                        "<option value=" + res.IDs[i] + ">" + res.Names[i] + "</option>"
+                                    );
+                            }
+                        }
+                    });
+                }
+                else{
+                    $.ajax({ //fill Params
+                        url: '@Url.Action("GetDOZORParameterNamesForGraph")',
+                        dataType: 'json',
+                        contentType: 'application/json',
+                        success: function (data) {
+                            for (var i = 0; i < data.Name.length; i++) {
+                                if (i == 0)
+                                    $("#APKComboIndexes_Graph").append(
+                                        "<option selected value=" + data.ID[i] + ">" + data.Name[i] + "</option>"
+                                    );
+                                else
+                                    $("#APKComboIndexes_Graph").append(
+                                        "<option value=" + data.ID[i] + ">" + data.Name[i] + "</option>"
+                                    );
+                            }
+                        }
+                    });
+                }
+
+                
+            }
+        });
+
+        $("#buildGraph").click(function () {
+            var dateFrom = new Date($('#DateFrom').val());
+            var dateTo = new Date($('#DateTo').val());
+            
+            if(CheckDates(dateFrom, dateTo) == true) return;
+
+            document.getElementById("loading_img").style.display = "inline-block";
+
+            var sdateFrom = dateFrom.getFullYear() + '-' + ("0" + (dateFrom.getMonth() + 1)).slice(-2) + '-' + ("0" + dateFrom.getDate()).slice(-2);
+            var sdateTo = dateTo.getFullYear() + '-' + ("0" + (dateTo.getMonth() + 1)).slice(-2) + '-' + ("0" + dateTo.getDate()).slice(-2);
+
+            //event.preventDefault();
+            var modl = @Html.Raw(Json.Encode(Model));
+            
+            if(modl != null){
+                var paramIDs = [];
+                var paramNames = [];
+            
+                $('#APKComboIndexes_Graph > option:selected').each(function(){
+                    paramIDs.push($(this).val()); 
+                    paramNames.push($(this).text());
+                });
+            
+                $.ajax({
+                    url: '@Url.Action("GetTableValuesForGraph")',
+                    dataType: 'json',
+                    contentType: 'application/json',
+                    data: { PostId: modl.APKID, From: sdateFrom, To: sdateTo, ParameterId: paramIDs, ParameterName: paramNames },
+                    traditional: true,
+                    //async: false,
+                    success: function(graph){
+                        drawVisualization(graph, paramNames);
+                    }
+                });
+            }
+            else{
+                var APKIDs = [];
+                var APKNames = [];
+                $('#APKListBox_Graph > option:selected').each(function(){
+                    APKIDs.push($(this).val()); 
+                    APKNames.push($(this).text());
+                });   
+
+                var paramID = $('#APKComboIndexes_Graph > option:selected').val();
+                
+                $.ajax({
+                    url: '@Url.Action("GetTableValuesForGraphNoModel")',
+                    dataType: 'json',
+                    contentType: 'application/json',
+                    data: { PostId: APKIDs, From: sdateFrom, To: sdateTo, ParameterId: paramID, APKName: APKNames },
+                    traditional: true,
+                    //async: false,
+                    success: function(graph){
+                        drawVisualization(graph, APKNames);
+                    }
+                });
+            }
+        });
+    });
+
+    function drawVisualization(graph, paramNames) {
+        var cData = new google.visualization.DataTable();
+        var columnCount = graph.Curves.length; //curves.columns.length;
+        var rowCount = graph.X.length; //curves.x.length;
+
+        //добавляем колонки
+        //var columns = curves.columns;
+        cData.addColumn("string", "x");
+        for (var i = 0; i < columnCount; i++) {
+            var columnName = paramNames[i];//graph.Curves[i].Name;
+            cData.addColumn("number", columnName);
+        }
+        //таблиця
+        $('#graph_table').empty();
+        
+        //добавляем данные
+        cData.addRows(rowCount);
+        /*for (var row = 0; row < rowCount; row++) {
+            cData.setValue(row, 0, graph.X[row]);
+            for (var column = 1; column <= columnCount; column++) {
+                if(graph.Curves[column - 1].Y[row].IsSet == true)
+                {
+                    var value = graph.Curves[column - 1].Y[row].Val;
+                    cData.setValue(row, column, value);
+                }
+            }
+        }*/
+        var tabletext = '';
+        for(var column = 0; column <= columnCount; column++)
+        {
+            if(column != 0)
+                tabletext = tabletext + '<tr><td>' + paramNames[column - 1] + '</td>';
+            else
+                tabletext = tabletext + '<tr><td></td>';
+            for(var row = 0; row < rowCount; row++)
+            {
+                
+                if(column == 0)
+                {
+                    tabletext = tabletext + '<td>' + graph.X[row] + '</td>';
+                    cData.setValue(row, 0, graph.X[row]);
+                }
+                else
+                {
+                    var sval = '-';
+                    if(graph.Curves[column - 1].Y[row].IsSet == true)
+                    {
+                        var value = graph.Curves[column - 1].Y[row].Val;
+                        cData.setValue(row, column, value);
+                        sval = value;
+                    }
+                    tabletext = tabletext + '<td>' + sval + '</td>';
+                }
+            }
+            tabletext = tabletext + '</tr>';
+        }
+
+        $('#graph_table').append(tabletext);
+        
+        // Create and draw the visualization.
+        var w = $('#graph').width() - 50;
+        $('#visualization').empty();
+        chart = new google.visualization.LineChart(document.getElementById('visualization'));
+        chart.draw(cData, {
+            /*series: {
+                1: {curveType: 'function'}
+            },*/
+            width: w, height: 500,
+            hAxis: {    
+                        title: graph.AbscissaName//,
+                        //format: '####' 
+                    },
+            vAxes: {
+                0: {
+                        title: graph.OrdinateName,
+                        format: '#,###'
+                }
+            }/*,
+            legend: { position: 'bottom' }*/
+        });
+        glob_graph = graph;
+        document.getElementById("loading_img").style.display = "none";
+    }
+
+    function CheckDates(dateFrom, dateTo){
+        var IsError = false;
+        if(dateFrom == 'Invalid Date'){
+            $('#DateFrom').css("border-color", "red");
+            IsError = true;
+        }
+        else
+            $('#DateFrom').css("border-color", "#9ACFE1");
+        if(dateTo == 'Invalid Date'){
+            $('#DateTo').css("border-color", "red");
+            IsError = true;
+        }
+        else
+            $('#DateTo').css("border-color", "#9ACFE1");
+            
+        if(dateFrom > dateTo){
+            $('#DateFrom').css("border-color", "red");
+            $('#DateTo').css("border-color", "red");
+            IsError = true;
+        }
+
+        return IsError;
+    }
+
+    function genPDF() {
+        var img = chart.getImageURI();
+        var doc = new jsPDF('l', 'pt', [$('#visualization').width(), $('#visualization').height()]);
+        img.height = $('#visualization').width();
+        img.width = $('#visualization').height();
+        doc.addImage(img, 'JPEG', 0, 0, img.width, img.height);
+        doc.save('graph.pdf');
+    };
+
+    function genPNG() {
+        var a = document.getElementById('hidden_a');
+        a.href = chart.getImageURI().replace("image/png", "image/octet-stream");
+        a.download = 'graph.png';
+        a.click();
+    };
+
+    function genXLS() {
+        /*html2canvas(document.getElementById("visualization"), {
+            onrendered: function (canvas) {*/
+                var a = document.getElementById('hidden_a');
+                var img = /*canvas.toDataURL("image/png")*/chart.getImageURI().replace(/^data[:]image\/(png|jpg|jpeg)[;]base64,/i, "");
+                $.ajax({
+                    type: "POST",
+                    url: '@Url.Action("UploadXLSImage")',
+                    data: { imageData: img, width: $('#visualization').width(), height: $('#visualization').height() },
+                    success: function (returnValue) {
+                        window.location = '@Url.Action("CreateGraphXLS")';
+                    }
+                });
+            /*}
+        });*/
+    };
+
+    function genTabPDF() {
+        html2canvas(document.getElementById("graph_table"), {
+            onrendered: function (canvas) {
+                var img = canvas.toDataURL("image/png");
+                var doc = new jsPDF('l', 'pt', [$('#graph_table').width(), $('#graph_table').height()]);
+                img.height = $('#graph_table').width();
+                img.width = $('#graph_table').height();
+                doc.addImage(img, 'JPEG', 0, 0, img.width, img.height);
+                doc.save('table.pdf');
+            }
+        });
+    };
+
+    function genTabPNG() {
+        html2canvas(document.getElementById("graph_table"), {
+            onrendered: function (canvas) {
+                var a = document.getElementById('hidden_a');
+                a.href = canvas.toDataURL().replace("image/png", "image/octet-stream");
+                a.download = 'table.png';
+                a.click();
+            }
+        });
+    };
+
+    function genTabXLS() {
+        window.location = '@Url.Action("GetTableXLS")';
+    };
+</script>
+
+@*<script type="text/javascript">
+    //$.noConflict();
+    // Code that uses other library's $ can follow here.
+</script>
+<script type="text/javascript" src="//www.google.com/jsapi"></script>
+<div>
+    <p>
+        Количество кривых
+        <input type="text" id="curvesNumber" value="3" />
+    </p>
+    <p>
+        Минимальное значение
+        <input type="text" id="minValue" value="0" />
+    </p>
+    <p>
+        Максимальное значение
+        <input type="text" id="maxValue" value="100" />
+    </p>
+    <p>
+        Количество точек
+        <input type="text" id="pointsNumber" value="10" /></p>
+    <br />
+    <select id="chartType">
+        <option disabled>Выберите тип графика</option>
+        <option selected value="2">AreaChart</option>
+        <option value="3">ColumnChart</option>
+        <option value="4">ScatterChart</option>
+        <option value="5">BarChart</option>
+        <option value="1">LineChart</option>
+    </select>
+    <div id="visualization" style="width: 500px; height: 400px;">
+    </div>
+    <br />
+    <input type="submit" id="btSend" value="Построить" />
+    <br />
+    <input type="submit" id="btExcel" value="Excel" />
+    <br />
+    <a href="@Url.Action("GetFile", "Home", new { Id = 1 })">Click to get file</a> <a
+        id="btGet">Click to get file(post)</a>
+</div>
+<script type="text/javascript">
+    google.load('visualization', '1', { packages: ['corechart'] });
+
+    $(document).ready(function () {
+        $("#btSend").click(function () {
+            // Stop form from submitting normally
+            console.log('dfdfd');
+            event.preventDefault();
+            $.post("/Home/GetValues",
+                    { makeChart: true, curvesNumber: $("#curvesNumber").val(), minValue: $("#minValue").val(), maxValue: $("#maxValue").val(), pointsNumber: $("#pointsNumber").val(), chartType: $("#chartType").val() },
+                    function (data) {
+                        drawVisualization(data.curves);
+                    }, "json");
+        })
+        $("#btExcel").click(function () {
+            // Stop form from submitting normally
+            event.preventDefault();
+            $.post("/Home/GetExcel",
+                    { makeExcel: true, curvesNumber: $("#curvesNumber").val(), minValue: $("#minValue").val(), maxValue: $("#maxValue").val(), pointsNumber: $("#pointsNumber").val(), chartType: $("#chartType").val() },
+                    function (data) {
+                        window.location.href = data;
+                    }, "html");
+        })
+
+        $("#btGet").click(function () {
+            $.post("/Home/GetFile/1",
+                    { makeExcel: true, curvesNumber: $("#curvesNumber").val(), minValue: $("#minValue").val(), maxValue: $("#maxValue").val(), pointsNumber: $("#pointsNumber").val(), chartType: $("#chartType").val() },
+                    function (data) {
+                    }, "json");
+        })
+    });
+
+
+    function drawVisualization(curves) {
+        var cData = new google.visualization.DataTable();
+        var columnCount = curves.columns.length;
+        var rowCount = curves.x.length;
+        //добавляем колонки
+        var columns = curves.columns;
+        cData.addColumn("number", "x");
+        for (var i = 0; i < columnCount; i++) {
+            var columnName = columns[i];
+            cData.addColumn("number", columnName);
+        }
+        //добавляем данные
+        cData.addRows(rowCount);
+        for (var row = 0; row < rowCount; row++) {
+            cData.setValue(row, 0, curves.x[row]);
+            for (var column = 1; column <= columns.length; column++) {
+                var value = curves.values[(columnCount * row) + column];
+                cData.setValue(row, column, value);
+            }
+        }
+
+        // Create and draw the visualization.
+        var chart;
+        var chartType = $("#chartType").val();
+        switch (chartType) {
+            case "2": chart = new google.visualization.AreaChart(document.getElementById('visualization')); break;
+            case "3": chart = new google.visualization.ColumnChart(document.getElementById('visualization')); break;
+            case "4": chart = new google.visualization.ScatterChart(document.getElementById('visualization')); break;
+            case "5": chart = new google.visualization.BarChart(document.getElementById('visualization')); break;
+            case "1":
+            default: chart = new google.visualization.LineChart(document.getElementById('visualization')); break;
+        }
+        chart.draw(cData, { curveType: "function",
+            width: 500, height: 400,
+            title: 'Самый невъебенный график',
+            hAxis: { format: '####' },
+            vAxes: {
+                0: {
+                    title: curves.vName,
+                    format: '#,###'
+                    //                            ,minValue: targetIncome * minIncomePercent,
+                    //                            maxValue: targetIncome
+                }
+            }
+        });
+    }
+
+</script>*@

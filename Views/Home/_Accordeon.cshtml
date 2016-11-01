@@ -1,0 +1,183 @@
+﻿@model SKEMD_WWW.Models.GraphValidationModel
+
+<div id="accordion" style="height: 100%; overflow: auto">
+    <h3 id="accordion_h3_img_2"><a class="accordion_title_a_opened" href="#">Інформація АПК</a></h3>
+    <div class="info_content" id="APKinfo_content">
+        
+        <label runat="server" id="lbl_Number_Name_of_post" class="css_lbl_Name_of_post"></label>
+        <div style="height: 0px; clear: left;"></div>
+
+        <label runat="server" id="lbl_Type_of_post" class="css_lbl_Type_of_post"></label>
+        <div style="height: 0px; clear: left;"></div>
+        
+        <label runat="server" id="lbl_Address_of_post" class="css_lbl_Address_of_post"></label>
+        <div style="height: 5px; clear: left;"></div>
+
+        <hr />
+        
+        <label id="lbl_Date_of_post" class="lbl_state_post_Date_Label"></label><br />
+
+        <label runat="server" id="lbl_Status_of_post" class="lbl_state_post_Date"></label>
+        <div style="height: 5px; clear: left;"></div>
+
+        <div id="APKIndexes" class="APKIndexesClass"></div>
+        <div style="border-bottom: 1px solid #DDDDDD; height: 15px; clear: left; clear: right;margin-bottom: 5px; width: 350px; margin-left: -10px;"></div>
+        
+        @using (Html.BeginForm()){ 
+            <div class="div_datetimepicker">
+                <label for="from_">з&nbsp;&nbsp;</label><img src="../../Content/img/accordion_10_date.png" />
+                @Html.EditorFor(m => m.DateFrom) @*<input type="text" id="from_" name="from_"/>*@
+                <label style="width:5px;"></label><img src="../../Content/img/accordion_11_time.png" />
+                @Html.EditorFor(m => m.TimeFrom) @*<input type="text" id="from_time_" />*@
+                <div style="clear:left; height:10px;"></div>
+                <label for="to_">по</label><img src="../../Content/img/accordion_10_date.png" />
+                @Html.EditorFor(m => m.DateTo) @*<input type="text" id="to_" name="to_"/>*@
+                <label style="width:5px;"></label><img src="../../Content/img/accordion_11_time.png" />
+                @Html.EditorFor(m => m.TimeTo) @*<input type="text" id="to_time_" />*@
+                <input type="hidden" name="APKID" id="hiddenAPKIDInput" value="0"/>
+            </div>
+
+            <div class="div_Information_buttons_grhaps_and_reports">
+                <button id="button_Graph" name="actionName" value="graph" type="submit" runat="server" class="btn_Info_Graph">Графік</button>
+                <button id="button_Report" name="actionName" value="report" type="submit" runat="server" class="btn_Info_Report">Звіт</button>
+            </div>
+        }
+    </div>
+
+    <h3 id="accordion_h3_img_15"><a class="accordion_title_a_closed" onclick="getDateTime()" href="#">Журнал подій</a></h3>
+    <div class="info_content" id="journal_content">
+        <div class="div_datetimepicker" style="height: 40px">
+            <label for="from">з&nbsp;&nbsp;</label><img src="../../Content/img/accordion_10_date.png" />
+            <input class="text-box single-line" id="JournalDateFrom" name="DateFrom" type="date" onchange="OnChangeJournalDateTime()">
+            <label style="width:5px;"></label><img src="../../Content/img/accordion_11_time.png" />
+            <input class="text-box single-line" id="JournalTimeFrom" name="TimeFrom" type="time" onchange="OnChangeJournalDateTime()">
+            <div style="clear:left; height:10px;"></div>
+        </div>
+        <script>
+            function getDateTime() {
+                var dt = new Date();
+                dt.setHours(dt.getHours() - 1);
+                document.getElementById('JournalDateFrom').value = dt.getFullYear() + '-' + ("0" + (dt.getMonth() + 1)).slice(-2) + '-' + ("0" + dt.getDate()).slice(-2);
+                document.getElementById('JournalTimeFrom').value = ("0" + dt.getHours()).slice(-2) + ':' + ("0" + dt.getMinutes()).slice(-2);
+                UpdateEventsJournal();
+            }
+        </script>
+        <div class="div_separator_1"></div>
+        <div id="eventJournal"></div>
+        @*
+        <div class="accordion_div_Events_State_1">
+                <label runat="server" id="lbl_Number_Name_of_post" class="css_lbl_Name_of_post">
+            22.12.2013 22:00
+        </label>
+        <div style="height: 0px; clear: left;">
+        </div>
+        <label runat="server" id="lbl_Type_of_post" class="css_lbl_Type_of_post">
+            Метеостанція | №12 | Прикордонний АПК
+        </label>
+        <div style="height: 0px; clear: left;">
+        </div>
+        <label runat="server" id="lbl_Address_of_post" class="css_lbl_Address_of_post">
+            м.Дніпродзержинськ, вул. Червоноармійська 34, корп. 7
+        </label>
+        <div style="height: 5px; clear: left;">
+        </div>
+        <div class="accordion_div_Events_message">
+        <img src="../../Content/img/accordion_24_pay_attention_yellow.png" />
+            <label class="l_1">
+                Пост на зв'язку
+            </label>
+            <label class="l_2">
+                </label>
+        </div>
+        </div>
+        <div style="height: 5px; clear: left;">        </div>*@
+    </div>
+    @******************************************@
+    <h3 id="accordion_h3_img_16"><a class="accordion_title_a_closed" href="#">Налаштування</a></h3>
+     
+    <div class="info_content" id="settings_content">
+        <label>Вибір системи:</label>
+        @Html.DropDownList("choose_system", new SelectList(new[]{"СКЕМД",  "Баглійкокс"}, "СКЕМД"))
+        <div class="div_separator_1"></div>
+        <label>Відображати пости за статусом:</label>
+        <div class="div_State_div_1">
+            <input type="checkbox"  onchange="javascript:APKTypeStatusClick('#active', 1)" class="myCheckBox" value="true" id="active" name="answer" checked="checked" />
+            <label class="checkbox_lbl" runat="server">Активний</label>
+        </div> 
+        <div class="div_State_div_2">
+            <input type="checkbox" onchange="javascript:APKTypeStatusClick('#repair', 0)" class="myCheckBox" value="true" id="repair" name="answer" checked="checked" />
+            <label class="checkbox_lbl" runat="server">В ремонті</label>
+        </div> 
+        <div class="div_State_div_1">
+            <input type="checkbox" onchange="javascript:APKTypeStatusClick('#over', 2)" class="myCheckBox" value="true" id="over" name="answer" checked="checked"/>
+            <label class="checkbox_lbl" runat="server">Перевищення критичного рівня</label>
+        </div>
+        <div class="div_State_div_2">
+            <input type="checkbox" onchange="javascript:APKTypeStatusClick('#noconnection', 3)" class="myCheckBox" value="true" id="noconnection" name="answer" checked="checked"/>
+            <label class="checkbox_lbl" runat="server">Немає зв'язку</label>
+        </div>
+        <div class="div_State_div_1">
+            <input type="checkbox" onchange="javascript:APKTypeStatusClick('#inactive', 4)" class="myCheckBox" value="true" id="inactive" name="answer" checked="checked"/>
+            <label class="checkbox_lbl" runat="server">Не активний</label>
+        </div>
+        <div class="div_separator_1"></div>
+        <label>Відображати типи постів:</label>
+        <div class="div_State_div_1">
+            <input type="checkbox"  onchange="APKTypeClick(0)" class="myCheckBox" value="true" id="chkAPKType0" checked="checked" />
+            <label class="checkbox_lbl checkbox_lbl_typepost" runat="server">Пост хімічного моніторингу</label>
+        </div> 
+        <div class="div_State_div_2">
+            <input type="checkbox" onchange="APKTypeClick(1)" class="myCheckBox" value="true" id="chkAPKType1" checked="checked" />
+            <label class="checkbox_lbl checkbox_lbl_typepost" runat="server">Пост гама моніторингу</label>
+        </div> 
+        <div class="div_State_div_1">
+            <input type="checkbox" onchange="APKTypeClick(2)" class="myCheckBox" value="true" id="chkAPKType2"checked="checked"/>
+            <label class="checkbox_lbl checkbox_lbl_typepost" runat="server">Пост гама моніторингу та контролю аерозолей</label>
+        </div>
+        <div class="div_State_div_2">
+            <input type="checkbox" onchange="APKTypeClick(3)" class="myCheckBox" value="true" id="chkAPKType3" checked="checked"/>
+            <label class="checkbox_lbl checkbox_lbl_typepost" runat="server">Пост контролю непоширення рад. забр.</label>
+        </div>
+        <div class="div_State_div_1">
+            <input type="checkbox"  onchange="APKTypeClick(4)" class="myCheckBox" value="true" id="chkAPKType4" checked="checked" />
+            <label class="checkbox_lbl checkbox_lbl_typepost" runat="server">Пост метеостанції</label>
+        </div> 
+        <div class="div_State_div_2">
+            <input type="checkbox" onchange="APKTypeClick(5)" class="myCheckBox" value="true" id="chkAPKType5" checked="checked" />
+            <label class="checkbox_lbl checkbox_lbl_typepost" runat="server">Пост гама та хімічного моніторингу</label>
+        </div> 
+        
+        <div class="spoiler-wrapper">
+            <div class="spoiler folded"><a href="javascript:void(0);">Розширені налаштування</a></div>
+            <div class="spoiler-text">
+
+                <div class="div_separator_1"></div>
+                <label>Вибір типу маркеру:</label>
+                @Html.DropDownList("choose_system", new SelectList(new[] { "Звичайний маркер", "Маркер з виведенням інформації" }, "Звичайний маркер"), new {@id = "markerTypeCombo", @onchange = "javascript:APKMarkerTypeClick(this.selectedIndex)" })
+                
+                <div class="div_separator_1"></div>
+                <label>Фільтр відображення типів показників:</label> <br />
+                <label>Пост:</label><br />
+                <select id="APKListCombo" onchange="APKListComboChange()"></select><br />
+                <label>Показник для відображення на маркері:</label><br />
+                <select id="APKMarkerIndexList" onchange="APKMarkerIndexComboChange()"></select><br />
+                <label>Показники для відображення в контексті:</label>
+                <div id="APKIndexesList"></div>
+                <div class="div_separator_1"></div>
+                <label>Період оновлення, хв:</label>
+                <input type="number" id="refreshPeriod" value="20" onchange="refreshPeriodChange()"/>
+                <div class="div_State_div_1">
+                    <input type="checkbox"  onchange="ChangeAutoCloseContext()" class="myCheckBox" value="true" id="autoCloseContext" checked="checked" />
+                    <label class="checkbox_lbl checkbox_lbl_typepost" runat="server">Автоматично закривати контекст</label>
+                </div>
+                <hr>
+                <div class="div_State_div_1">
+                    <input type="checkbox"  onchange="ChangeAutoChangeContext()" class="myCheckBox" value="false" id="autoChangeContext" />
+                    <label class="checkbox_lbl checkbox_lbl_typepost" runat="server">Періодично змінювати відкритий контекст</label>
+                </div> 
+                <label>Період зміни, хв:</label>
+                <input type="number" id="changeContextPeriod" value="3" onchange="changeContextPeriodChange()"/>
+            </div>
+        </div>
+    </div>
+    </div>

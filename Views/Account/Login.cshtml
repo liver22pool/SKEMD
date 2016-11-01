@@ -1,0 +1,77 @@
+﻿@model SKEMD_WWW.Models.LoginModel
+
+@{
+    Layout = null;// "~/Views/Shared/_Layout.cshtml";
+}
+
+@Styles.Render("~/Content/login")
+
+<div class="header" style="height: 57px">
+    <div style="width: 450px; margin: 0 auto; padding: 0 100px">
+        <img src="~/Content/img/header_1_logo.png" id="img_header_logo" />
+        <div id="img_header_title" style="text-align: center">
+            <label>Система комплексного екологічного</label>
+            <div style="height: 4px;"></div>
+            <label>моніторингу м.Дніпродзержинськ</label>
+        </div>
+    </div>
+</div>
+
+@using (Html.BeginForm(new { ReturnUrl = ViewBag.ReturnUrl })) {
+    @Html.AntiForgeryToken()
+   @* @Html.ValidationSummary(true)*@
+
+    <br />
+    <br />
+    <div id="img_login_title" style="text-align: center">
+        <label>Форма автентифікації користувачів</label>   
+    </div>
+    <br />
+    <br />
+    <br />
+    <div style="width: 300px; margin: 0 auto">
+    <fieldset id="inputs" style="width: 100%">
+        <input id="username" name="UserName" type="text" placeholder="Логін" autofocus required>   
+        <label style="margin: auto 28px; font: 20px; color: red">@ViewBag.UserError</label>
+        <br />
+        <input id="password" name="Password" type="password" placeholder="Пароль" required>
+    </fieldset>
+    <fieldset id="actions" style="width: 100%">
+        <input type="submit" id="submit" value="Вхід" style="width: 100%">
+    </fieldset>
+    </div>
+    
+    @*<fieldset>
+        <legend>Log in Form</legend>
+        <ol>
+            <li>
+                @Html.LabelFor(m => m.UserName, new { })
+                @Html.TextBoxFor(m => m.UserName)
+                @Html.ValidationMessageFor(m => m.UserName)
+            </li>
+            <li>
+                @Html.LabelFor(m => m.Password)
+                @Html.PasswordFor(m => m.Password)
+                @Html.ValidationMessageFor(m => m.Password)
+            </li>
+            <li>
+                @Html.CheckBoxFor(m => m.RememberMe)
+                @Html.LabelFor(m => m.RememberMe, new { @class = "checkbox" })
+            </li>
+        </ol>
+        <input type="submit" value="Log in" />
+    </fieldset>
+    <p>
+        @Html.ActionLink("Register", "Register") if you don't have an account.
+    </p>*@
+}
+</section>
+
+@*<section class="social" id="socialLoginForm">
+    <h2>Use another service to log in.</h2>
+    @Html.Action("ExternalLoginsList", new { ReturnUrl = ViewBag.ReturnUrl })
+</section>*@
+
+@section Scripts {
+    @Scripts.Render("~/bundles/jqueryval")
+}
